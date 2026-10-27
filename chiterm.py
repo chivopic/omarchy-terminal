@@ -9,6 +9,7 @@ import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Vte', '3.91')
 from gi.repository import Gio, GLib, Gtk, Pango, Vte
+from terminal_links import install_link_handler
 
 APP_ID = 'io.github.chivopic.Chiterm'
 # PCRE2 compile flags required by VTE: UTF, Unicode, multiline and caseless.
@@ -103,6 +104,7 @@ class TerminalWindow(Gtk.ApplicationWindow):
         terminal.set_font(Pango.FontDescription.from_string('monospace 11'))
         terminal.set_font_scale(self.font_scale)
         terminal.set_mouse_autohide(True)
+        install_link_handler(terminal)
         terminal.connect('child-exited', lambda term, _status: self.remove_terminal(term))
         terminal.connect('window-title-changed', self.update_title)
         focus = Gtk.EventControllerFocus()
