@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A small native terminal for Omarchy, powered by GTK 4 and VTE."""
+"""Chiterm: a native terminal powered by GTK 4 and VTE."""
 import os
 import sys
 from pathlib import Path
@@ -10,7 +10,7 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Vte', '3.91')
 from gi.repository import Gio, GLib, Gtk, Pango, Vte
 
-APP_ID = 'io.github.chivopic.OmarchyTerminal'
+APP_ID = 'io.github.chivopic.Chiterm'
 
 
 def current_directory(terminal):
@@ -27,7 +27,7 @@ def current_directory(terminal):
 
 class TerminalWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
-        super().__init__(application=app, title='Omarchy Terminal')
+        super().__init__(application=app, title='Chiterm')
         self.set_default_size(1000, 650)
         self.active_terminal = None
         self.focused_by_page = {}
@@ -37,7 +37,7 @@ class TerminalWindow(Gtk.ApplicationWindow):
         container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.set_child(container)
         header = Gtk.HeaderBar()
-        header.set_title_widget(Gtk.Label(label='Omarchy Terminal'))
+        header.set_title_widget(Gtk.Label(label='Chiterm'))
         add = Gtk.Button.new_from_icon_name('tab-new-symbolic')
         add.set_tooltip_text('New tab (Ctrl+Shift+T)')
         add.connect('clicked', lambda *_: self.new_tab())

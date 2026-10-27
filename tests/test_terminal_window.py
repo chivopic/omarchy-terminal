@@ -3,7 +3,7 @@ import os
 import time
 import unittest
 
-from omarchy_terminal import Application, GLib, Gtk, TerminalWindow
+from chiterm import Application, GLib, Gtk, TerminalWindow
 
 
 def pump_until(predicate, timeout=3):
