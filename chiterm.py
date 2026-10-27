@@ -2,6 +2,7 @@
 """Chiterm: a native terminal powered by GTK 4 and VTE."""
 import os
 import sys
+import weakref
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
@@ -9,6 +10,7 @@ import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Vte', '3.91')
 from gi.repository import Gio, GLib, Gtk, Pango, Vte
+from terminal_links import install_link_handler
 
 APP_ID = 'io.github.chivopic.Chiterm'
 # PCRE2 compile flags required by VTE: UTF, Unicode, multiline and caseless.
@@ -106,10 +108,11 @@ class TerminalWindow(Gtk.ApplicationWindow):
         terminal.set_font(Pango.FontDescription.from_string('monospace 11'))
         terminal.set_font_scale(self.font_scale)
         terminal.set_mouse_autohide(True)
+        install_link_handler(terminal)
         terminal.connect('child-exited', lambda term, _status: self.remove_terminal(term))
         terminal.connect('window-title-changed', self.update_title)
         focus = Gtk.EventControllerFocus()
-        focus.connect('enter', lambda *_: self.set_active(terminal))
+        focus.connect('enter', lambda controller: self.set_active(controller.get_widget()))
         terminal.add_controller(focus)
         shell = os.environ.get('SHELL') or '/bin/sh'
         if not os.path.isfile(shell) or not os.access(shell, os.X_OK):
@@ -123,11 +126,14 @@ class TerminalWindow(Gtk.ApplicationWindow):
             terminal.feed(('\r\nCould not start shell: ' + str(error) + '\r\n').encode())
 
     def set_active(self, terminal):
+        changed = self.active_terminal is not terminal
         page = self.page_for(terminal)
         if page is not None:
             self.focused_by_page[page] = terminal
         self.active_terminal = terminal
         self.update_title(terminal)
+        if changed and self.search_bar.get_visible():
+            self.find_text()
 
     def update_title(self, terminal):
         page = self.page_for(terminal)
@@ -253,29 +259,40 @@ class TerminalWindow(Gtk.ApplicationWindow):
 
     def open_search(self):
         self.search_bar.set_visible(True)
+        if self.search_entry.get_text():
+            self.find_text()
         self.search_entry.grab_focus()
 
     def close_search(self):
         self.search_bar.set_visible(False)
+        self.clear_search()
         self.search_status.set_text('')
         if self.active_terminal:
             self.active_terminal.grab_focus()
+
+    def clear_search(self):
+        terminal = self.search_terminal() if self.search_terminal else None
+        if terminal is not None:
+            terminal.search_set_regex(None, 0)
+        self.search_terminal = None
+        self.search_query = None
 
     def find_text(self, previous=False):
         terminal = self.active_terminal
         query = self.search_entry.get_text()
         if not terminal or not query:
-            self.search_terminal = None
-            self.search_query = None
+            self.clear_search()
             self.search_status.set_text('')
             return False
-        if self.search_terminal != terminal or self.search_query != query:
+        searched = self.search_terminal() if self.search_terminal else None
+        if searched is not terminal or self.search_query != query:
+            self.clear_search()
             # Escape user input so that search is literal, including punctuation.
             pattern = GLib.regex_escape_string(query, -1)
             regex = Vte.Regex.new_for_search(pattern, -1, SEARCH_FLAGS)
             terminal.search_set_regex(regex, 0)
             terminal.search_set_wrap_around(True)
-            self.search_terminal, self.search_query = terminal, query
+            self.search_terminal, self.search_query = weakref.ref(terminal), query
         found = terminal.search_find_previous() if previous else terminal.search_find_next()
         self.search_status.set_text('' if found else 'No matches')
         return found

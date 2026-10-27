@@ -86,7 +86,7 @@ Bug reports and focused pull requests are welcome. See [CONTRIBUTING.md](CONTRIB
 | Ctrl+- | Zoom out |
 | Ctrl+0 | Reset zoom |
 
-Closing a pane or window ends its shell and any foreground process; save your work first. Click a pane to focus it. The menu in the header exposes the same main actions.
+Closing a pane or window ends its shell and any foreground process; save your work first. Ctrl-click an HTTP(S) link to open it in the default browser. Click a pane to focus it. The menu in the header exposes the same main actions.
 
 ## License
 
