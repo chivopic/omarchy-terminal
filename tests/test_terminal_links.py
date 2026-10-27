@@ -32,9 +32,10 @@ class TerminalLinkTests(unittest.TestCase):
         gesture = Mock()
         gesture.get_current_event_state.return_value = Gdk.ModifierType.CONTROL_MASK
         terminal = Mock()
+        gesture.get_widget.return_value = terminal
         terminal.check_hyperlink_at.return_value = 'https://example.com/a?'
         with patch('terminal_links.Gio.AppInfo.launch_default_for_uri') as launch:
-            _on_pressed(gesture, 1, 12, 24, terminal)
+            _on_pressed(gesture, 1, 12, 24)
         launch.assert_called_once_with('https://example.com/a?', None)
         gesture.set_state.assert_called_once_with(Gtk.EventSequenceState.CLAIMED)
         terminal.check_match_at.assert_not_called()
@@ -43,22 +44,24 @@ class TerminalLinkTests(unittest.TestCase):
         gesture = Mock()
         gesture.get_current_event_state.return_value = Gdk.ModifierType.CONTROL_MASK
         terminal = Mock()
+        gesture.get_widget.return_value = terminal
         terminal.check_hyperlink_at.return_value = None
         terminal.check_match_at.return_value = ('https://example.com/a).', 1)
         with patch('terminal_links.Gio.AppInfo.launch_default_for_uri') as launch:
-            _on_pressed(gesture, 1, 12, 24, terminal)
+            _on_pressed(gesture, 1, 12, 24)
         launch.assert_called_once_with('https://example.com/a', None)
 
     def test_unmodified_click_and_unsupported_hyperlink_pass_through(self):
         gesture = Mock()
         terminal = Mock()
+        gesture.get_widget.return_value = terminal
         gesture.get_current_event_state.return_value = Gdk.ModifierType(0)
         with patch('terminal_links.Gio.AppInfo.launch_default_for_uri') as launch:
-            _on_pressed(gesture, 1, 0, 0, terminal)
+            _on_pressed(gesture, 1, 0, 0)
             terminal.check_hyperlink_at.assert_not_called()
             gesture.get_current_event_state.return_value = Gdk.ModifierType.CONTROL_MASK
             terminal.check_hyperlink_at.return_value = 'file:///etc/passwd'
-            _on_pressed(gesture, 1, 0, 0, terminal)
+            _on_pressed(gesture, 1, 0, 0)
             launch.assert_not_called()
         gesture.set_state.assert_not_called()
         terminal.check_match_at.assert_not_called()

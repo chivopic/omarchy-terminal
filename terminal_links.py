@@ -47,13 +47,14 @@ def install_link_handler(terminal):
     click = Gtk.GestureClick.new()
     click.set_button(1)
     click.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
-    click.connect('pressed', _on_pressed, terminal)
+    click.connect('pressed', _on_pressed)
     terminal.add_controller(click)
 
 
-def _on_pressed(gesture, _press_count, x, y, terminal):
+def _on_pressed(gesture, _press_count, x, y):
     if not (gesture.get_current_event_state() & Gdk.ModifierType.CONTROL_MASK):
         return
+    terminal = gesture.get_widget()
     target = terminal.check_hyperlink_at(x, y)
     # Explicit hyperlink targets are authoritative, even if unsupported.
     from_text = target is None
