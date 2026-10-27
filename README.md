@@ -32,6 +32,10 @@ cd omarchy-terminal
 
 Use the system Python because the packages above provide its GTK and VTE bindings. The application uses `$SHELL` when it points to an executable file, falling back to `/bin/sh` otherwise. The GTK theme follows your desktop settings; terminal colors currently use VTE defaults.
 
+## Working directories
+
+New tabs and splits use the focused terminal’s reported local directory. Your shell must emit OSC 7 for this to work; without a valid local directory report, they start in your home directory. Remote directory reports are not used as local paths.
+
 ## Working with panes and tabs
 
 Use the **+** button or the header menu to open a tab. Click a pane to focus it, then use the menu or shortcuts below to split it. Drag the divider to resize panes; drag a tab label to reorder tabs. Closing the last pane in a tab closes that tab.
