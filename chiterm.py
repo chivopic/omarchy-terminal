@@ -35,6 +35,7 @@ class TerminalWindow(Gtk.ApplicationWindow):
         self.set_default_size(1000, 650)
         self.active_terminal = None
         self.focused_by_page = {}
+        self.maximized_by_page = {}
         self.search_terminal = None
         self.search_query = None
         self.font_scale = 1.0
@@ -52,6 +53,7 @@ class TerminalWindow(Gtk.ApplicationWindow):
         for label, action in [('New Tab', 'new-tab'), ('Split Left / Right', 'split-right'),
                               ('Split Top / Bottom', 'split-down'), ('Close Pane', 'close-pane'),
                               ('Next Pane', 'next-pane'), ('Previous Pane', 'previous-pane'),
+                              ('Toggle Pane Zoom', 'toggle-pane-zoom'),
                               ('Copy', 'copy'), ('Paste', 'paste'), ('Find', 'find'), ('Zoom In', 'zoom-in'),
                               ('Zoom Out', 'zoom-out'), ('Reset Zoom', 'zoom-reset')]:
             menu.append(label, 'win.' + action)
@@ -91,6 +93,7 @@ class TerminalWindow(Gtk.ApplicationWindow):
             'find-previous': lambda: self.find_text(previous=True),
             'next-pane': lambda: self.change_pane(1),
             'previous-pane': lambda: self.change_pane(-1),
+            'toggle-pane-zoom': self.toggle_pane_zoom,
             'zoom-out': lambda: self.zoom(-0.1), 'zoom-reset': lambda: self.zoom(None),
             'next-tab': lambda: self.change_tab(1), 'previous-tab': lambda: self.change_tab(-1),
         }.items():
@@ -161,6 +164,7 @@ class TerminalWindow(Gtk.ApplicationWindow):
         old = self.active_terminal
         if not old or not self.page_for(old):
             return
+        self.restore_pane_zoom(self.page_for(old))
         parent = old.get_parent()
         new = self.make_terminal(current_directory(old))
         if isinstance(parent, Gtk.Paned):
@@ -187,6 +191,7 @@ class TerminalWindow(Gtk.ApplicationWindow):
         page = self.page_for(terminal)
         if page is None:
             return
+        self.restore_pane_zoom(page)
         selected_page = self.notebook.get_nth_page(self.notebook.get_current_page())
         was_active = terminal == self.active_terminal
         parent = terminal.get_parent()
@@ -308,6 +313,33 @@ class TerminalWindow(Gtk.ApplicationWindow):
         if count:
             self.notebook.set_current_page((self.notebook.get_current_page() + step) % count)
 
+    def restore_pane_zoom(self, page):
+        for widget in self.maximized_by_page.pop(page, []):
+            widget.set_visible(True)
+
+    def toggle_pane_zoom(self):
+        terminal = self.active_terminal
+        page = self.page_for(terminal) if terminal else None
+        if page is None:
+            return
+        if page in self.maximized_by_page:
+            self.restore_pane_zoom(page)
+        else:
+            hidden = []
+            child = terminal
+            while child != page:
+                parent = child.get_parent()
+                if isinstance(parent, Gtk.Paned):
+                    sibling = (parent.get_end_child() if parent.get_start_child() == child
+                               else parent.get_start_child())
+                    if sibling and sibling.get_visible():
+                        hidden.append(sibling)
+                        sibling.set_visible(False)
+                child = parent
+            if hidden:
+                self.maximized_by_page[page] = hidden
+        terminal.grab_focus()
+
     def change_pane(self, step):
         page = self.notebook.get_nth_page(self.notebook.get_current_page())
         if not page:
@@ -323,6 +355,8 @@ class TerminalWindow(Gtk.ApplicationWindow):
         panes = terminals(page)
         if self.active_terminal in panes:
             terminal = panes[(panes.index(self.active_terminal) + step) % len(panes)]
+            if terminal != self.active_terminal:
+                self.restore_pane_zoom(page)
             self.set_active(terminal)
             terminal.grab_focus()
 
@@ -345,6 +379,7 @@ class Application(Gtk.Application):
             'find-previous': ['<Control><Shift><Alt>g'],
             'next-pane': ['<Control><Shift>bracketright'],
             'previous-pane': ['<Control><Shift>bracketleft'],
+            'toggle-pane-zoom': ['<Control><Shift>Return'],
             'next-tab': ['<Control>Page_Down'], 'previous-tab': ['<Control>Page_Up'],
             'zoom-in': ['<Control>plus', '<Control>equal'], 'zoom-out': ['<Control>minus'],
             'zoom-reset': ['<Control>0'],
