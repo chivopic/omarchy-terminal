@@ -35,8 +35,10 @@ class TerminalWindow(Gtk.ApplicationWindow):
         self.focused_by_page = {}
         self.search_terminal = None
         self.search_query = None
+        self.confirmation_open = False
         self.font_scale = 1.0
         self.set_icon_name('utilities-terminal')
+        self.connect('close-request', self.on_close_request)
 
         container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.set_child(container)
@@ -181,6 +183,9 @@ class TerminalWindow(Gtk.ApplicationWindow):
         page = self.page_for(terminal)
         if page is None:
             return
+        if self.search_terminal == terminal:
+            self.search_terminal = None
+            self.search_query = None
         selected_page = self.notebook.get_nth_page(self.notebook.get_current_page())
         was_active = terminal == self.active_terminal
         parent = terminal.get_parent()
@@ -235,8 +240,39 @@ class TerminalWindow(Gtk.ApplicationWindow):
         self.focus_page(page)
 
     def close_active(self):
-        if self.active_terminal:
-            self.remove_terminal(self.active_terminal)
+        terminal = self.active_terminal
+        if terminal:
+            self.confirm_close('Close this pane?', lambda confirmed:
+                               self.remove_terminal(terminal) if confirmed else None)
+
+    def on_close_request(self, _window):
+        if self.notebook.get_n_pages() == 0:
+            return False
+        def finish(confirmed):
+            if confirmed:
+                self.destroy()
+        self.confirm_close('Close this window?', finish)
+        return True
+
+    def confirm_close(self, message, callback):
+        if self.confirmation_open:
+            return
+        self.confirmation_open = True
+        dialog = Gtk.AlertDialog.new(message)
+        dialog.set_detail('Running commands in the affected terminals may be terminated.')
+        dialog.set_buttons(['Cancel', 'Close'])
+        dialog.set_cancel_button(0)
+        dialog.set_default_button(0)
+
+        def done(dialog, result, _data):
+            self.confirmation_open = False
+            try:
+                confirmed = dialog.choose_finish(result) == 1
+            except GLib.Error:
+                confirmed = False
+            callback(confirmed)
+
+        dialog.choose(self, None, done, None)
 
     def copy(self):
         if self.active_terminal:
@@ -291,19 +327,20 @@ class TerminalWindow(Gtk.ApplicationWindow):
         if count:
             self.notebook.set_current_page((self.notebook.get_current_page() + step) % count)
 
+    def terminals_in(self, widget):
+        if isinstance(widget, Vte.Terminal):
+            return [widget]
+        if isinstance(widget, Gtk.Paned):
+            return self.terminals_in(widget.get_start_child()) + self.terminals_in(widget.get_end_child())
+        if isinstance(widget, Gtk.Box):
+            return self.terminals_in(widget.get_first_child())
+        return []
+
     def change_pane(self, step):
         page = self.notebook.get_nth_page(self.notebook.get_current_page())
         if not page:
             return
-        def terminals(widget):
-            if isinstance(widget, Vte.Terminal):
-                return [widget]
-            if isinstance(widget, Gtk.Paned):
-                return terminals(widget.get_start_child()) + terminals(widget.get_end_child())
-            if isinstance(widget, Gtk.Box):
-                return terminals(widget.get_first_child())
-            return []
-        panes = terminals(page)
+        panes = self.terminals_in(page)
         if self.active_terminal in panes:
             terminal = panes[(panes.index(self.active_terminal) + step) % len(panes)]
             self.set_active(terminal)

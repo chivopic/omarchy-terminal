@@ -2,6 +2,7 @@
 import os
 import time
 import unittest
+from unittest.mock import patch
 
 from chiterm import Application, GLib, Gtk, TerminalWindow, Vte
 
@@ -99,9 +100,28 @@ class TerminalWindowTests(unittest.TestCase):
     def test_closing_selected_pane_focuses_its_sibling(self):
         remaining = self.win.active_terminal
         self.split()
-        self.win.close_active()
+        with patch.object(self.win, 'confirm_close', side_effect=lambda _message, done: done(True)):
+            self.win.close_active()
         self.assertIs(self.win.active_terminal, remaining)
         self.assertEqual(self.win.notebook.get_n_pages(), 1)
+
+    def test_cancelled_close_keeps_pane_and_shell(self):
+        terminal = self.split()
+        with patch.object(self.win, 'confirm_close', side_effect=lambda _message, done: done(False)):
+            self.win.close_active()
+        self.assertIs(self.win.active_terminal, terminal)
+        self.assertIsNotNone(self.win.page_for(terminal))
+        self.assertIsNotNone(terminal.get_pty())
+
+    def test_confirmed_close_targets_original_pane(self):
+        first = self.win.active_terminal
+        second = self.split()
+        with patch.object(self.win, 'confirm_close') as confirm:
+            self.win.close_active()
+            self.win.set_active(first)
+            confirm.call_args.args[1](True)
+        self.assertIsNone(self.win.page_for(second))
+        self.assertIs(self.win.active_terminal, first)
 
     def test_inactive_pane_title_does_not_replace_active_pane_title(self):
         first = self.win.active_terminal
