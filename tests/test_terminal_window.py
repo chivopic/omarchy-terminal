@@ -116,6 +116,20 @@ class TerminalWindowTests(unittest.TestCase):
         self.assertIsNotNone(self.win.page_for(terminal))
         self.assertIsNotNone(terminal.get_pty())
 
+    def test_close_pane_opens_a_real_confirmation_dialog(self):
+        terminal = self.win.active_terminal
+        self.win.close_active()
+        self.assertTrue(self.win.confirmation_open)
+        self.assertIsNotNone(self.win.page_for(terminal))
+
+    def test_cancelled_window_close_preserves_open_panes(self):
+        first = self.win.active_terminal
+        second = self.split()
+        with patch.object(self.win, 'confirm_close', side_effect=lambda _message, done: done(False)):
+            self.assertTrue(self.win.on_close_request(self.win))
+        self.assertIsNotNone(self.win.page_for(first))
+        self.assertIsNotNone(self.win.page_for(second))
+
     def test_confirmed_close_targets_original_pane(self):
         first = self.win.active_terminal
         second = self.split()

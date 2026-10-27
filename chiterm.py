@@ -288,7 +288,7 @@ class TerminalWindow(Gtk.ApplicationWindow):
         if self.confirmation_open:
             return
         self.confirmation_open = True
-        dialog = Gtk.AlertDialog.new(message)
+        dialog = Gtk.AlertDialog(message=message)
         dialog.set_detail('Running commands in the affected terminals may be terminated.')
         dialog.set_buttons(['Cancel', 'Close'])
         dialog.set_cancel_button(0)
