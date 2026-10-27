@@ -187,6 +187,15 @@ class TerminalWindowTests(unittest.TestCase):
         self.win.change_pane(1)
         self.assertIs(self.win.active_terminal, isolated)
 
+    def test_active_pane_indicator_follows_keyboard_navigation(self):
+        first = self.win.active_terminal
+        second = self.split()
+        self.assertTrue(second.has_css_class('active-pane'))
+        self.assertFalse(first.has_css_class('active-pane'))
+        self.win.change_pane(1)
+        self.assertTrue(first.has_css_class('active-pane'))
+        self.assertFalse(second.has_css_class('active-pane'))
+
     def test_theme_refresh_keeps_last_valid_palette_during_replacement(self):
         self.split()
         with tempfile.TemporaryDirectory() as directory:

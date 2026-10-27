@@ -8,7 +8,8 @@ from urllib.parse import unquote, urlparse
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Vte', '3.91')
-from gi.repository import Gio, GLib, Gtk, Pango, Vte
+gi.require_version('Gdk', '4.0')
+from gi.repository import Gdk, Gio, GLib, Gtk, Pango, Vte
 from chiterm_theme import read_theme, theme_path
 
 APP_ID = 'io.github.chivopic.Chiterm'
@@ -106,6 +107,7 @@ class TerminalWindow(Gtk.ApplicationWindow):
 
     def make_terminal(self, cwd):
         terminal = Vte.Terminal(hexpand=True, vexpand=True)
+        terminal.add_css_class('chiterm-pane')
         terminal.set_scrollback_lines(10000)
         terminal.set_font(Pango.FontDescription.from_string('monospace 11'))
         terminal.set_font_scale(self.font_scale)
@@ -125,7 +127,7 @@ class TerminalWindow(Gtk.ApplicationWindow):
         return terminal
 
     def spawned(self, terminal, pid, error, _data):
-        if error:
+        if terminal and error:
             terminal.feed(('\r\nCould not start shell: ' + str(error) + '\r\n').encode())
 
     @staticmethod
@@ -147,10 +149,13 @@ class TerminalWindow(Gtk.ApplicationWindow):
         return True
 
     def set_active(self, terminal):
+        if self.active_terminal and self.active_terminal != terminal:
+            self.active_terminal.remove_css_class('active-pane')
         page = self.page_for(terminal)
         if page is not None:
             self.focused_by_page[page] = terminal
         self.active_terminal = terminal
+        terminal.add_css_class('active-pane')
         self.update_title(terminal)
 
     def update_title(self, terminal):
@@ -382,14 +387,17 @@ class Application(Gtk.Application):
 
     def do_startup(self):
         Gtk.Application.do_startup(self)
+        css = Gtk.CssProvider()
+        css.load_from_data(b'.chiterm-pane { border: 2px solid transparent; } .chiterm-pane.active-pane { border-color: #8dbea6; }')
+        Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         for action, keys in {
             'new-tab': ['<Control><Shift>t'], 'close-pane': ['<Control><Shift>w'],
             'split-right': ['<Control><Shift>d'], 'split-down': ['<Control><Shift>e'],
             'copy': ['<Control><Shift>c'], 'paste': ['<Control><Shift>v'],
             'find': ['<Control><Shift>f'], 'find-next': ['<Control><Shift>g'],
             'find-previous': ['<Control><Shift><Alt>g'],
-            'next-pane': ['<Control><Shift>bracketright'],
-            'previous-pane': ['<Control><Shift>bracketleft'],
+            'next-pane': ['<Control><Shift>Right'],
+            'previous-pane': ['<Control><Shift>Left'],
             'next-tab': ['<Control>Page_Down'], 'previous-tab': ['<Control>Page_Up'],
             'zoom-in': ['<Control>plus', '<Control>equal'], 'zoom-out': ['<Control>minus'],
             'zoom-reset': ['<Control>0'],
