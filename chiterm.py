@@ -11,6 +11,8 @@ gi.require_version('Vte', '3.91')
 from gi.repository import Gio, GLib, Gtk, Pango, Vte
 
 APP_ID = 'io.github.chivopic.Chiterm'
+# PCRE2 compile flags required by VTE: UTF, Unicode, multiline and caseless.
+SEARCH_FLAGS = 0x00080000 | 0x00020000 | 0x00000400 | 0x00000008
 
 
 def current_directory(terminal):
@@ -31,6 +33,8 @@ class TerminalWindow(Gtk.ApplicationWindow):
         self.set_default_size(1000, 650)
         self.active_terminal = None
         self.focused_by_page = {}
+        self.search_terminal = None
+        self.search_query = None
         self.font_scale = 1.0
         self.set_icon_name('utilities-terminal')
 
@@ -45,12 +49,34 @@ class TerminalWindow(Gtk.ApplicationWindow):
         menu = Gio.Menu()
         for label, action in [('New Tab', 'new-tab'), ('Split Left / Right', 'split-right'),
                               ('Split Top / Bottom', 'split-down'), ('Close Pane', 'close-pane'),
-                              ('Copy', 'copy'), ('Paste', 'paste'), ('Zoom In', 'zoom-in'),
+                              ('Copy', 'copy'), ('Paste', 'paste'), ('Find', 'find'), ('Zoom In', 'zoom-in'),
                               ('Zoom Out', 'zoom-out'), ('Reset Zoom', 'zoom-reset')]:
             menu.append(label, 'win.' + action)
         menu_button = Gtk.MenuButton(icon_name='open-menu-symbolic', menu_model=menu)
         header.pack_end(menu_button)
         container.append(header)
+        self.search_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        self.search_bar.set_margin_top(6)
+        self.search_bar.set_margin_bottom(6)
+        self.search_bar.set_margin_start(8)
+        self.search_bar.set_margin_end(8)
+        self.search_entry = Gtk.SearchEntry(hexpand=True, placeholder_text='Find in current pane')
+        self.search_entry.connect('changed', lambda *_: self.find_text())
+        self.search_entry.connect('activate', lambda *_: self.find_text())
+        self.search_bar.append(self.search_entry)
+        self.search_status = Gtk.Label(label='')
+        self.search_bar.append(self.search_status)
+        for icon, tooltip, callback in [
+            ('go-up-symbolic', 'Previous match', lambda: self.find_text(previous=True)),
+            ('go-down-symbolic', 'Next match', self.find_text),
+            ('window-close-symbolic', 'Close search', self.close_search),
+        ]:
+            button = Gtk.Button.new_from_icon_name(icon)
+            button.set_tooltip_text(tooltip)
+            button.connect('clicked', lambda _button, cb=callback: cb())
+            self.search_bar.append(button)
+        self.search_bar.set_visible(False)
+        container.append(self.search_bar)
         self.notebook = Gtk.Notebook(scrollable=True, hexpand=True, vexpand=True)
         self.notebook.connect('switch-page', self.on_switch_page)
         container.append(self.notebook)
@@ -58,6 +84,8 @@ class TerminalWindow(Gtk.ApplicationWindow):
             'new-tab': self.new_tab, 'split-right': lambda: self.split(Gtk.Orientation.HORIZONTAL),
             'split-down': lambda: self.split(Gtk.Orientation.VERTICAL), 'close-pane': self.close_active,
             'copy': self.copy, 'paste': self.paste, 'zoom-in': lambda: self.zoom(0.1),
+            'find': self.open_search, 'find-next': self.find_text,
+            'find-previous': lambda: self.find_text(previous=True),
             'zoom-out': lambda: self.zoom(-0.1), 'zoom-reset': lambda: self.zoom(None),
             'next-tab': lambda: self.change_tab(1), 'previous-tab': lambda: self.change_tab(-1),
         }.items():
@@ -215,6 +243,35 @@ class TerminalWindow(Gtk.ApplicationWindow):
         if self.active_terminal:
             self.active_terminal.paste_clipboard()
 
+    def open_search(self):
+        self.search_bar.set_visible(True)
+        self.search_entry.grab_focus()
+
+    def close_search(self):
+        self.search_bar.set_visible(False)
+        self.search_status.set_text('')
+        if self.active_terminal:
+            self.active_terminal.grab_focus()
+
+    def find_text(self, previous=False):
+        terminal = self.active_terminal
+        query = self.search_entry.get_text()
+        if not terminal or not query:
+            self.search_terminal = None
+            self.search_query = None
+            self.search_status.set_text('')
+            return False
+        if self.search_terminal != terminal or self.search_query != query:
+            # Escape user input so that search is literal, including punctuation.
+            pattern = GLib.regex_escape_string(query, -1)
+            regex = Vte.Regex.new_for_search(pattern, -1, SEARCH_FLAGS)
+            terminal.search_set_regex(regex, 0)
+            terminal.search_set_wrap_around(True)
+            self.search_terminal, self.search_query = terminal, query
+        found = terminal.search_find_previous() if previous else terminal.search_find_next()
+        self.search_status.set_text('' if found else 'No matches')
+        return found
+
     def zoom(self, delta):
         self.font_scale = 1.0 if delta is None else max(0.5, min(2.0, self.font_scale + delta))
         def visit(widget):
@@ -246,6 +303,8 @@ class Application(Gtk.Application):
             'new-tab': ['<Control><Shift>t'], 'close-pane': ['<Control><Shift>w'],
             'split-right': ['<Control><Shift>d'], 'split-down': ['<Control><Shift>e'],
             'copy': ['<Control><Shift>c'], 'paste': ['<Control><Shift>v'],
+            'find': ['<Control><Shift>f'], 'find-next': ['<Control><Shift>g'],
+            'find-previous': ['<Control><Shift><Alt>g'],
             'next-tab': ['<Control>Page_Down'], 'previous-tab': ['<Control>Page_Up'],
             'zoom-in': ['<Control>plus', '<Control>equal'], 'zoom-out': ['<Control>minus'],
             'zoom-reset': ['<Control>0'],

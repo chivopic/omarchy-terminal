@@ -3,7 +3,7 @@ import os
 import time
 import unittest
 
-from chiterm import Application, GLib, Gtk, TerminalWindow
+from chiterm import Application, GLib, Gtk, TerminalWindow, Vte
 
 
 def pump_until(predicate, timeout=3):
@@ -113,6 +113,39 @@ class TerminalWindowTests(unittest.TestCase):
         first.feed(b'\x1b]0;inactive pane\x07')
         pump_until(lambda: first.get_window_title() == 'inactive pane')
         self.assertEqual(label.get_text(), 'active pane')
+
+    def test_search_is_case_insensitive_and_treats_punctuation_as_text(self):
+        terminal = self.win.active_terminal
+        terminal.feed(b'\r\nBuild v1.2 [ready]\r\n')
+        pump_until(lambda: terminal.get_cursor_position().row >= 1)
+        self.win.open_search()
+        self.win.search_entry.set_text('V1.2 [READY]')
+        pump_until(self.win.find_text)
+        self.assertEqual(terminal.get_text_selected(Vte.Format.TEXT), 'v1.2 [ready]')
+        self.win.search_entry.set_text('v1x2')
+        self.assertFalse(self.win.find_text())
+        self.assertEqual(self.win.search_status.get_text(), 'No matches')
+
+    def test_search_targets_only_the_focused_pane(self):
+        first = self.win.active_terminal
+        first.feed(b'\r\nneedle in first pane\r\n')
+        pump_until(lambda: first.get_cursor_position().row >= 1)
+        second = self.split()
+        self.win.search_entry.set_text('needle in first pane')
+        self.assertFalse(self.win.find_text())
+        self.assertIs(self.win.active_terminal, second)
+
+    def test_search_advances_and_wraps_between_matches(self):
+        terminal = self.win.active_terminal
+        terminal.feed(b'\r\napple\r\nAPPLE\r\n')
+        self.win.search_entry.set_text('apple')
+        pump_until(self.win.find_text)
+        first = terminal.get_text_selected(Vte.Format.TEXT)
+        self.assertTrue(self.win.find_text())
+        second = terminal.get_text_selected(Vte.Format.TEXT)
+        self.assertNotEqual(first, second)
+        self.assertTrue(self.win.find_text())
+        self.assertEqual(first, terminal.get_text_selected(Vte.Format.TEXT))
 
 
 if __name__ == '__main__':
