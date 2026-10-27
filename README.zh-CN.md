@@ -12,7 +12,8 @@
 
 - 标签页：支持拖动排序和 shell 提供的标题
 - 左右、上下分屏，支持嵌套
-- 复制、粘贴、滚动回看和字体缩放
+- 复制、粘贴、滚动回看、字体缩放和当前面板搜索
+- 使用键盘切换面板
 - 当 shell 通过 OSC 7 报告当前目录时，新标签和分屏会继承聚焦面板的目录；否则从主目录启动
 - 原生 GTK 窗口，支持 Wayland 和 X11
 
@@ -31,7 +32,7 @@ sudo pacman -S python python-gobject gtk4 vte4
 ```sh
 git clone https://github.com/chivopic/omarchy-terminal.git
 cd omarchy-terminal
-/usr/bin/python omarchy_terminal.py
+/usr/bin/python chiterm.py
 ```
 
 请使用系统 Python：上面的软件包为它提供 GTK 和 VTE 绑定。应用优先使用 `$SHELL` 指向的可执行文件，不可用时回退到 `/bin/sh`。GTK 界面跟随桌面设置；终端颜色目前使用 VTE 默认值。
@@ -48,7 +49,7 @@ cd omarchy-terminal
 
 - 关闭面板或窗口前不会确认，即使其中有命令正在运行。
 - 应用退出后不会恢复标签和面板。
-- 尚未实现配置档、终端搜索和 Omarchy 终端配色自动同步。
+- 尚未实现配置档和 Omarchy 终端配色自动同步。
 
 ## 常见问题
 
@@ -59,7 +60,7 @@ cd omarchy-terminal
 
 ## 路线图
 
-接下来优先完善面板焦点和安全关闭，再考虑搜索、键盘导航和 Omarchy 主题集成。优先级和当前状态详见[路线图](ROADMAP.md#简体中文)。
+接下来优先完善安全关闭、可重复验证和 Omarchy 主题集成。优先级和当前状态详见[路线图](ROADMAP.md#简体中文)。
 
 ## 参与贡献
 
@@ -75,6 +76,9 @@ cd omarchy-terminal
 | Ctrl+Shift+W | 关闭当前面板（或标签） |
 | Ctrl+Shift+C | 复制选中内容 |
 | Ctrl+Shift+V | 粘贴 |
+| Ctrl+Shift+F | 搜索当前面板 |
+| Ctrl+Shift+G / Ctrl+Shift+Alt+G | 下一个 / 上一个结果 |
+| Ctrl+Shift+] / Ctrl+Shift+[ | 下一个 / 上一个面板 |
 | Ctrl+Page Up | 上一个标签 |
 | Ctrl+Page Down | 下一个标签 |
 | Ctrl++ 或 Ctrl+= | 放大字体 |
