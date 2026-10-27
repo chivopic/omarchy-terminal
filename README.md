@@ -12,7 +12,7 @@ A small, native terminal inspired by the everyday workflow of iTerm2, built for 
 - New tabs and splits start in the focused pane's directory when the shell reports it via OSC 7; otherwise they start in your home directory
 - Native GTK window, usable on Wayland and X11
 
-This is an early MVP, not a complete iTerm2 replacement. It does not yet include profiles, search, session restoration, automatic Omarchy theme synchronization, or a confirmation when closing a running shell.
+This is an early MVP, not a complete iTerm2 replacement. See [Current limitations](#current-limitations) before using it for important work.
 
 ## Run
 
@@ -57,6 +57,12 @@ Use the **+** button or the header menu to open a tab. Click a pane to focus it,
 | Ctrl+0 | Reset zoom |
 
 Closing a pane or window ends its shell and any foreground process; save your work first. Click a pane to focus it. The menu in the header exposes the same main actions.
+
+## Current limitations
+
+- There is no confirmation before closing a pane or window, even when a command is running.
+- Tabs and panes are not restored after the application exits.
+- Profiles, terminal search, and automatic Omarchy terminal color synchronization are not implemented.
 
 ## Troubleshooting
 
