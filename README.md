@@ -42,6 +42,16 @@ The application uses `$SHELL`, falling back to `/bin/sh`. The GTK theme follows 
 
 Closing a pane or window ends its shell and any foreground process; save your work first. Click a pane to focus it. The menu in the header exposes the same main actions.
 
+## Tests
+
+With the dependencies above and a running graphical session, run:
+
+```sh
+/usr/bin/python -m unittest discover -s tests -v
+```
+
+These GTK integration tests launch `/bin/sh` in real VTE panes and exercise tab focus, shell exits, nested splits, and titles. They need a GTK display; they can also run with GTK's Broadway backend on a headless machine.
+
 ## License
 
 MIT
