@@ -1,4 +1,4 @@
-# Omarchy Terminal
+# Chiterm
 
 English | [简体中文](README.zh-CN.md)
 
@@ -31,7 +31,7 @@ Clone the repository and start the application:
 ```sh
 git clone https://github.com/chivopic/omarchy-terminal.git
 cd omarchy-terminal
-/usr/bin/python omarchy_terminal.py
+/usr/bin/python chiterm.py
 ```
 
 Use the system Python because the packages above provide its GTK and VTE bindings. The application uses `$SHELL` when it points to an executable file, falling back to `/bin/sh` otherwise. The GTK theme follows your desktop settings; terminal colors currently use VTE defaults.

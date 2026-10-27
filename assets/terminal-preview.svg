@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
-  <title id="title">Omarchy Terminal workspace illustration</title>
+  <title id="title">Chiterm workspace illustration</title>
   <desc id="desc">A stylized terminal window with tabs and two side-by-side shell panes.</desc>
   <defs>
     <linearGradient id="back" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#151e2c"/><stop offset="1" stop-color="#10121d"/></linearGradient>
@@ -10,7 +10,7 @@
   <rect width="1280" height="720" fill="url(#back)"/>
   <circle cx="1070" cy="100" r="250" fill="url(#glow)"/>
   <circle cx="160" cy="660" r="220" fill="url(#glow)"/>
-  <text x="110" y="68" fill="#e7efe9" font-family="sans-serif" font-size="22" font-weight="700" letter-spacing="1">OMARCHY TERMINAL</text>
+  <text x="110" y="68" fill="#e7efe9" font-family="sans-serif" font-size="22" font-weight="700" letter-spacing="1">CHITERM</text>
   <text x="1170" y="68" fill="#9aabaf" font-family="sans-serif" font-size="14" text-anchor="end" letter-spacing="2">TABS · SPLITS · SHELL</text>
   <rect x="110" y="139" width="1060" height="480" rx="14" fill="#000" opacity=".48" filter="url(#shadow)"/>
   <g clip-path="url(#window)">
@@ -18,7 +18,7 @@
     <rect x="110" y="125" width="1060" height="52" fill="#26313b"/>
     <rect x="128" y="137" width="30" height="28" rx="6" fill="#3b4952"/>
     <path d="M143 144v14m-7-7h14" stroke="#dce7e0" stroke-width="2" stroke-linecap="round"/>
-    <text x="640" y="158" text-anchor="middle" fill="#e8f1ec" font-family="sans-serif" font-size="16" font-weight="600">Omarchy Terminal</text>
+    <text x="640" y="158" text-anchor="middle" fill="#e8f1ec" font-family="sans-serif" font-size="16" font-weight="600">Chiterm</text>
     <path d="M1100 145h17m-17 6h17m-17 6h17" stroke="#dce7e0" stroke-width="2" stroke-linecap="round"/>
     <circle cx="1141" cy="151" r="11" fill="#52606a"/><path d="M1137 147l8 8m0-8l-8 8" stroke="#e8efeb" stroke-width="1.5"/>
     <rect x="110" y="177" width="1060" height="42" fill="#202a34"/>
@@ -32,7 +32,7 @@
       <text x="145" y="268" fill="#84d6b0">❯ <tspan fill="#e3ece6">pwd</tspan></text>
       <text x="145" y="300" fill="#a9bcb6">/home/user/Projects/omarchy-terminal</text>
       <text x="145" y="349" fill="#84d6b0">❯ <tspan fill="#e3ece6">ls</tspan></text>
-      <text x="145" y="381" fill="#9cb9ec">README.md  <tspan fill="#a9bcb6">omarchy_terminal.py</tspan></text>
+      <text x="145" y="381" fill="#9cb9ec">README.md  <tspan fill="#a9bcb6">chiterm.py</tspan></text>
       <text x="145" y="430" fill="#84d6b0">❯</text>
       <text x="678" y="268" fill="#88b9f2">❯ <tspan fill="#e3ece6">git status</tspan></text>
       <text x="678" y="300" fill="#a9bcb6">On branch main</text>
