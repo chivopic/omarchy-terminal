@@ -58,6 +58,13 @@ Use the **+** button or the header menu to open a tab. Click a pane to focus it,
 
 Closing a pane or window ends its shell and any foreground process; save your work first. Click a pane to focus it. The menu in the header exposes the same main actions.
 
+## Troubleshooting
+
+- **`No module named gi`**: install `python-gobject` and launch with `/usr/bin/python`, not a virtual environment without system bindings.
+- **GTK or VTE namespace unavailable**: check that `gtk4` and `vte4` are installed.
+- **No window opens**: start the application from a running Wayland or X11 desktop session and read any error printed in the launching terminal.
+- **A new pane opens in your home directory**: check whether your shell reports its directory through OSC 7.
+
 ## License
 
 MIT
