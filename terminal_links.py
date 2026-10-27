@@ -9,7 +9,7 @@ from gi.repository import Gdk, Gio, GLib, Gtk, Vte
 # characters and common quoting delimiters; trailing punctuation is trimmed
 # separately so URLs in prose remain useful.
 MATCH_FLAGS = 0x00080000 | 0x00000400
-URL_PATTERN = r"https?://[^\s\x00-\x1f\x7f<>\"']+"
+URL_PATTERN = r"(?i)https?://[^\s\x00-\x1f\x7f<>\"']+"
 
 
 def normalize_url(value, *, from_text=False):
@@ -17,12 +17,16 @@ def normalize_url(value, *, from_text=False):
     if not value or any(ord(char) < 32 or ord(char) == 127 for char in value):
         return None
     if from_text:
-        value = value.rstrip('.,;:!?')
         # Preserve balanced parentheses (common in wiki URLs), stripping only
         # unmatched closing delimiters added by surrounding prose.
-        for opening, closing in [('(', ')'), ('[', ']'), ('{', '}')]:
-            while value.endswith(closing) and value.count(closing) > value.count(opening):
-                value = value[:-1]
+        while value:
+            trimmed = value.rstrip('.,;:!?')
+            for opening, closing in [('(', ')'), ('[', ']'), ('{', '}')]:
+                while trimmed.endswith(closing) and trimmed.count(closing) > trimmed.count(opening):
+                    trimmed = trimmed[:-1]
+            if trimmed == value:
+                break
+            value = trimmed
     try:
         parts = urlsplit(value)
         if parts.scheme.lower() not in ('http', 'https') or not parts.hostname:

@@ -1,4 +1,5 @@
 """Tests for terminal URL handling without opening a browser."""
+import re
 import unittest
 from unittest.mock import Mock, patch
 
@@ -10,10 +11,14 @@ from terminal_links import MATCH_FLAGS, URL_PATTERN, _on_pressed, normalize_url
 class TerminalLinkTests(unittest.TestCase):
     def test_vte_accepts_the_match_expression(self):
         self.assertIsNotNone(Vte.Regex.new_for_match(URL_PATTERN, -1, MATCH_FLAGS))
+        self.assertEqual(re.search(URL_PATTERN, 'see HTTPS://example.com').group(),
+                         'HTTPS://example.com')
 
     def test_plain_text_trims_prose_punctuation_but_keeps_balanced_parentheses(self):
         self.assertEqual(normalize_url('https://example.com/wiki/Name_(topic)).', from_text=True),
                          'https://example.com/wiki/Name_(topic)')
+        self.assertEqual(normalize_url('HTTPS://example.com/path.)', from_text=True),
+                         'HTTPS://example.com/path')
         self.assertEqual(normalize_url('https://example.com/path?', from_text=False),
                          'https://example.com/path?')
 
