@@ -4,6 +4,10 @@
 
 一个受 iTerm2 日常工作流启发的原生终端，面向 Omarchy 和其他 Linux 桌面。应用基于 GTK 4 和 VTE，每个面板都运行真实 shell，支持终端程序、颜色和滚动回看。
 
+![终端标签和左右分屏的示意图](assets/terminal-preview.svg)
+
+*工作区示意图，实际外观取决于桌面主题。*
+
 ## MVP 功能
 
 - 标签页：支持拖动排序和 shell 提供的标题

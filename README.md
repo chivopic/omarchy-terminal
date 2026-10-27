@@ -4,6 +4,10 @@ English | [简体中文](README.zh-CN.md)
 
 A small, native terminal inspired by the everyday workflow of iTerm2, built for Omarchy and other Linux desktops. It uses GTK 4 and VTE, so each pane runs a real shell with terminal applications, colors and scrollback.
 
+![Illustration of a tabbed terminal with two split panes](assets/terminal-preview.svg)
+
+*Workspace illustration; the actual appearance depends on your desktop theme.*
+
 ## MVP
 
 - Tabs, with drag-to-reorder and shell-provided titles
