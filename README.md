@@ -40,6 +40,23 @@ New tabs and splits use the focused terminal’s reported local directory. Your 
 
 Use the **+** button or the header menu to open a tab. Click a pane to focus it, then use the menu or shortcuts below to split it. Drag the divider to resize panes; drag a tab label to reorder tabs. Closing the last pane in a tab closes that tab.
 
+## Current limitations
+
+- There is no confirmation before closing a pane or window, even when a command is running.
+- Tabs and panes are not restored after the application exits.
+- Profiles, terminal search, and automatic Omarchy terminal color synchronization are not implemented.
+
+## Troubleshooting
+
+- **`No module named gi`**: install `python-gobject` and launch with `/usr/bin/python`, not a virtual environment without system bindings.
+- **GTK or VTE namespace unavailable**: check that `gtk4` and `vte4` are installed.
+- **No window opens**: start the application from a running Wayland or X11 desktop session and read any error printed in the launching terminal.
+- **A new pane opens in your home directory**: check whether your shell reports its directory through OSC 7.
+
+## Contributing
+
+Bug reports and focused pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Shortcuts
 
 | Shortcut | Action |
@@ -57,19 +74,6 @@ Use the **+** button or the header menu to open a tab. Click a pane to focus it,
 | Ctrl+0 | Reset zoom |
 
 Closing a pane or window ends its shell and any foreground process; save your work first. Click a pane to focus it. The menu in the header exposes the same main actions.
-
-## Current limitations
-
-- There is no confirmation before closing a pane or window, even when a command is running.
-- Tabs and panes are not restored after the application exits.
-- Profiles, terminal search, and automatic Omarchy terminal color synchronization are not implemented.
-
-## Troubleshooting
-
-- **`No module named gi`**: install `python-gobject` and launch with `/usr/bin/python`, not a virtual environment without system bindings.
-- **GTK or VTE namespace unavailable**: check that `gtk4` and `vte4` are installed.
-- **No window opens**: start the application from a running Wayland or X11 desktop session and read any error printed in the launching terminal.
-- **A new pane opens in your home directory**: check whether your shell reports its directory through OSC 7.
 
 ## License
 
