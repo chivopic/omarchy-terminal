@@ -49,6 +49,7 @@ class TerminalWindow(Gtk.ApplicationWindow):
         menu = Gio.Menu()
         for label, action in [('New Tab', 'new-tab'), ('Split Left / Right', 'split-right'),
                               ('Split Top / Bottom', 'split-down'), ('Close Pane', 'close-pane'),
+                              ('Next Pane', 'next-pane'), ('Previous Pane', 'previous-pane'),
                               ('Copy', 'copy'), ('Paste', 'paste'), ('Find', 'find'), ('Zoom In', 'zoom-in'),
                               ('Zoom Out', 'zoom-out'), ('Reset Zoom', 'zoom-reset')]:
             menu.append(label, 'win.' + action)
@@ -86,6 +87,8 @@ class TerminalWindow(Gtk.ApplicationWindow):
             'copy': self.copy, 'paste': self.paste, 'zoom-in': lambda: self.zoom(0.1),
             'find': self.open_search, 'find-next': self.find_text,
             'find-previous': lambda: self.find_text(previous=True),
+            'next-pane': lambda: self.change_pane(1),
+            'previous-pane': lambda: self.change_pane(-1),
             'zoom-out': lambda: self.zoom(-0.1), 'zoom-reset': lambda: self.zoom(None),
             'next-tab': lambda: self.change_tab(1), 'previous-tab': lambda: self.change_tab(-1),
         }.items():
@@ -288,6 +291,24 @@ class TerminalWindow(Gtk.ApplicationWindow):
         if count:
             self.notebook.set_current_page((self.notebook.get_current_page() + step) % count)
 
+    def change_pane(self, step):
+        page = self.notebook.get_nth_page(self.notebook.get_current_page())
+        if not page:
+            return
+        def terminals(widget):
+            if isinstance(widget, Vte.Terminal):
+                return [widget]
+            if isinstance(widget, Gtk.Paned):
+                return terminals(widget.get_start_child()) + terminals(widget.get_end_child())
+            if isinstance(widget, Gtk.Box):
+                return terminals(widget.get_first_child())
+            return []
+        panes = terminals(page)
+        if self.active_terminal in panes:
+            terminal = panes[(panes.index(self.active_terminal) + step) % len(panes)]
+            self.set_active(terminal)
+            terminal.grab_focus()
+
 
 class Application(Gtk.Application):
     def __init__(self):
@@ -305,6 +326,8 @@ class Application(Gtk.Application):
             'copy': ['<Control><Shift>c'], 'paste': ['<Control><Shift>v'],
             'find': ['<Control><Shift>f'], 'find-next': ['<Control><Shift>g'],
             'find-previous': ['<Control><Shift><Alt>g'],
+            'next-pane': ['<Control><Shift>bracketright'],
+            'previous-pane': ['<Control><Shift>bracketleft'],
             'next-tab': ['<Control>Page_Down'], 'previous-tab': ['<Control>Page_Up'],
             'zoom-in': ['<Control>plus', '<Control>equal'], 'zoom-out': ['<Control>minus'],
             'zoom-reset': ['<Control>0'],

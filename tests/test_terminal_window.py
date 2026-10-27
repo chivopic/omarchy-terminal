@@ -147,6 +147,23 @@ class TerminalWindowTests(unittest.TestCase):
         self.assertTrue(self.win.find_text())
         self.assertEqual(first, terminal.get_text_selected(Vte.Format.TEXT))
 
+    def test_keyboard_pane_cycle_respects_nested_splits_and_tabs(self):
+        first = self.win.active_terminal
+        second = self.split()
+        third = self.split()
+        self.win.change_pane(1)
+        self.assertIs(self.win.active_terminal, first)
+        self.win.change_pane(1)
+        self.assertIs(self.win.active_terminal, second)
+        self.win.change_pane(-1)
+        self.assertIs(self.win.active_terminal, first)
+        self.win.change_pane(-1)
+        self.assertIs(self.win.active_terminal, third)
+        self.win.new_tab()
+        isolated = self.win.active_terminal
+        self.win.change_pane(1)
+        self.assertIs(self.win.active_terminal, isolated)
+
 
 if __name__ == '__main__':
     unittest.main()
