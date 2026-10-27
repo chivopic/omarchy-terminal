@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""A small native terminal for Omarchy, powered by GTK 4 and VTE."""
+"""Chiterm: a native terminal powered by GTK 4 and VTE."""
 import os
 import sys
+import weakref
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
@@ -10,7 +11,9 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Vte', '3.91')
 from gi.repository import Gio, GLib, Gtk, Pango, Vte
 
-APP_ID = 'io.github.chivopic.OmarchyTerminal'
+APP_ID = 'io.github.chivopic.Chiterm'
+# PCRE2 compile flags required by VTE: UTF, Unicode, multiline and caseless.
+SEARCH_FLAGS = 0x00080000 | 0x00020000 | 0x00000400 | 0x00000008
 
 
 def current_directory(terminal):
@@ -27,17 +30,19 @@ def current_directory(terminal):
 
 class TerminalWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
-        super().__init__(application=app, title='Omarchy Terminal')
+        super().__init__(application=app, title='Chiterm')
         self.set_default_size(1000, 650)
         self.active_terminal = None
         self.focused_by_page = {}
+        self.search_terminal = None
+        self.search_query = None
         self.font_scale = 1.0
         self.set_icon_name('utilities-terminal')
 
         container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.set_child(container)
         header = Gtk.HeaderBar()
-        header.set_title_widget(Gtk.Label(label='Omarchy Terminal'))
+        header.set_title_widget(Gtk.Label(label='Chiterm'))
         add = Gtk.Button.new_from_icon_name('tab-new-symbolic')
         add.set_tooltip_text('New tab (Ctrl+Shift+T)')
         add.connect('clicked', lambda *_: self.new_tab())
@@ -45,12 +50,35 @@ class TerminalWindow(Gtk.ApplicationWindow):
         menu = Gio.Menu()
         for label, action in [('New Tab', 'new-tab'), ('Split Left / Right', 'split-right'),
                               ('Split Top / Bottom', 'split-down'), ('Close Pane', 'close-pane'),
-                              ('Copy', 'copy'), ('Paste', 'paste'), ('Zoom In', 'zoom-in'),
+                              ('Next Pane', 'next-pane'), ('Previous Pane', 'previous-pane'),
+                              ('Copy', 'copy'), ('Paste', 'paste'), ('Find', 'find'), ('Zoom In', 'zoom-in'),
                               ('Zoom Out', 'zoom-out'), ('Reset Zoom', 'zoom-reset')]:
             menu.append(label, 'win.' + action)
         menu_button = Gtk.MenuButton(icon_name='open-menu-symbolic', menu_model=menu)
         header.pack_end(menu_button)
         container.append(header)
+        self.search_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        self.search_bar.set_margin_top(6)
+        self.search_bar.set_margin_bottom(6)
+        self.search_bar.set_margin_start(8)
+        self.search_bar.set_margin_end(8)
+        self.search_entry = Gtk.SearchEntry(hexpand=True, placeholder_text='Find in current pane')
+        self.search_entry.connect('changed', lambda *_: self.find_text())
+        self.search_entry.connect('activate', lambda *_: self.find_text())
+        self.search_bar.append(self.search_entry)
+        self.search_status = Gtk.Label(label='')
+        self.search_bar.append(self.search_status)
+        for icon, tooltip, callback in [
+            ('go-up-symbolic', 'Previous match', lambda: self.find_text(previous=True)),
+            ('go-down-symbolic', 'Next match', self.find_text),
+            ('window-close-symbolic', 'Close search', self.close_search),
+        ]:
+            button = Gtk.Button.new_from_icon_name(icon)
+            button.set_tooltip_text(tooltip)
+            button.connect('clicked', lambda _button, cb=callback: cb())
+            self.search_bar.append(button)
+        self.search_bar.set_visible(False)
+        container.append(self.search_bar)
         self.notebook = Gtk.Notebook(scrollable=True, hexpand=True, vexpand=True)
         self.notebook.connect('switch-page', self.on_switch_page)
         container.append(self.notebook)
@@ -58,6 +86,10 @@ class TerminalWindow(Gtk.ApplicationWindow):
             'new-tab': self.new_tab, 'split-right': lambda: self.split(Gtk.Orientation.HORIZONTAL),
             'split-down': lambda: self.split(Gtk.Orientation.VERTICAL), 'close-pane': self.close_active,
             'copy': self.copy, 'paste': self.paste, 'zoom-in': lambda: self.zoom(0.1),
+            'find': self.open_search, 'find-next': self.find_text,
+            'find-previous': lambda: self.find_text(previous=True),
+            'next-pane': lambda: self.change_pane(1),
+            'previous-pane': lambda: self.change_pane(-1),
             'zoom-out': lambda: self.zoom(-0.1), 'zoom-reset': lambda: self.zoom(None),
             'next-tab': lambda: self.change_tab(1), 'previous-tab': lambda: self.change_tab(-1),
         }.items():
@@ -75,7 +107,7 @@ class TerminalWindow(Gtk.ApplicationWindow):
         terminal.connect('child-exited', lambda term, _status: self.remove_terminal(term))
         terminal.connect('window-title-changed', self.update_title)
         focus = Gtk.EventControllerFocus()
-        focus.connect('enter', lambda *_: self.set_active(terminal))
+        focus.connect('enter', lambda controller: self.set_active(controller.get_widget()))
         terminal.add_controller(focus)
         shell = os.environ.get('SHELL') or '/bin/sh'
         if not os.path.isfile(shell) or not os.access(shell, os.X_OK):
@@ -89,11 +121,14 @@ class TerminalWindow(Gtk.ApplicationWindow):
             terminal.feed(('\r\nCould not start shell: ' + str(error) + '\r\n').encode())
 
     def set_active(self, terminal):
+        changed = self.active_terminal is not terminal
         page = self.page_for(terminal)
         if page is not None:
             self.focused_by_page[page] = terminal
         self.active_terminal = terminal
         self.update_title(terminal)
+        if changed and self.search_bar.get_visible():
+            self.find_text()
 
     def update_title(self, terminal):
         page = self.page_for(terminal)
@@ -215,6 +250,46 @@ class TerminalWindow(Gtk.ApplicationWindow):
         if self.active_terminal:
             self.active_terminal.paste_clipboard()
 
+    def open_search(self):
+        self.search_bar.set_visible(True)
+        if self.search_entry.get_text():
+            self.find_text()
+        self.search_entry.grab_focus()
+
+    def close_search(self):
+        self.search_bar.set_visible(False)
+        self.clear_search()
+        self.search_status.set_text('')
+        if self.active_terminal:
+            self.active_terminal.grab_focus()
+
+    def clear_search(self):
+        terminal = self.search_terminal() if self.search_terminal else None
+        if terminal is not None:
+            terminal.search_set_regex(None, 0)
+        self.search_terminal = None
+        self.search_query = None
+
+    def find_text(self, previous=False):
+        terminal = self.active_terminal
+        query = self.search_entry.get_text()
+        if not terminal or not query:
+            self.clear_search()
+            self.search_status.set_text('')
+            return False
+        searched = self.search_terminal() if self.search_terminal else None
+        if searched is not terminal or self.search_query != query:
+            self.clear_search()
+            # Escape user input so that search is literal, including punctuation.
+            pattern = GLib.regex_escape_string(query, -1)
+            regex = Vte.Regex.new_for_search(pattern, -1, SEARCH_FLAGS)
+            terminal.search_set_regex(regex, 0)
+            terminal.search_set_wrap_around(True)
+            self.search_terminal, self.search_query = weakref.ref(terminal), query
+        found = terminal.search_find_previous() if previous else terminal.search_find_next()
+        self.search_status.set_text('' if found else 'No matches')
+        return found
+
     def zoom(self, delta):
         self.font_scale = 1.0 if delta is None else max(0.5, min(2.0, self.font_scale + delta))
         def visit(widget):
@@ -231,6 +306,24 @@ class TerminalWindow(Gtk.ApplicationWindow):
         if count:
             self.notebook.set_current_page((self.notebook.get_current_page() + step) % count)
 
+    def change_pane(self, step):
+        page = self.notebook.get_nth_page(self.notebook.get_current_page())
+        if not page:
+            return
+        def terminals(widget):
+            if isinstance(widget, Vte.Terminal):
+                return [widget]
+            if isinstance(widget, Gtk.Paned):
+                return terminals(widget.get_start_child()) + terminals(widget.get_end_child())
+            if isinstance(widget, Gtk.Box):
+                return terminals(widget.get_first_child())
+            return []
+        panes = terminals(page)
+        if self.active_terminal in panes:
+            terminal = panes[(panes.index(self.active_terminal) + step) % len(panes)]
+            self.set_active(terminal)
+            terminal.grab_focus()
+
 
 class Application(Gtk.Application):
     def __init__(self):
@@ -246,6 +339,10 @@ class Application(Gtk.Application):
             'new-tab': ['<Control><Shift>t'], 'close-pane': ['<Control><Shift>w'],
             'split-right': ['<Control><Shift>d'], 'split-down': ['<Control><Shift>e'],
             'copy': ['<Control><Shift>c'], 'paste': ['<Control><Shift>v'],
+            'find': ['<Control><Shift>f'], 'find-next': ['<Control><Shift>g'],
+            'find-previous': ['<Control><Shift><Alt>g'],
+            'next-pane': ['<Control><Shift>bracketright'],
+            'previous-pane': ['<Control><Shift>bracketleft'],
             'next-tab': ['<Control>Page_Down'], 'previous-tab': ['<Control>Page_Up'],
             'zoom-in': ['<Control>plus', '<Control>equal'], 'zoom-out': ['<Control>minus'],
             'zoom-reset': ['<Control>0'],

@@ -2,8 +2,9 @@
 import os
 import time
 import unittest
+import weakref
 
-from omarchy_terminal import Application, GLib, Gtk, TerminalWindow
+from chiterm import Application, GLib, Gtk, TerminalWindow, Vte
 
 
 def pump_until(predicate, timeout=3):
@@ -113,6 +114,127 @@ class TerminalWindowTests(unittest.TestCase):
         first.feed(b'\x1b]0;inactive pane\x07')
         pump_until(lambda: first.get_window_title() == 'inactive pane')
         self.assertEqual(label.get_text(), 'active pane')
+
+    def test_search_is_case_insensitive_and_treats_punctuation_as_text(self):
+        terminal = self.win.active_terminal
+        terminal.feed(b'\r\nBuild v1.2 [ready]\r\n')
+        pump_until(lambda: terminal.get_cursor_position().row >= 1)
+        self.win.open_search()
+        self.win.search_entry.set_text('V1.2 [READY]')
+        pump_until(self.win.find_text)
+        self.assertEqual(terminal.get_text_selected(Vte.Format.TEXT), 'v1.2 [ready]')
+        self.win.search_entry.set_text('v1x2')
+        self.assertFalse(self.win.find_text())
+        self.assertEqual(self.win.search_status.get_text(), 'No matches')
+
+    def test_search_targets_only_the_focused_pane(self):
+        first = self.win.active_terminal
+        first.feed(b'\r\nneedle in first pane\r\n')
+        pump_until(lambda: first.get_cursor_position().row >= 1)
+        second = self.split()
+        self.win.search_entry.set_text('needle in first pane')
+        self.assertFalse(self.win.find_text())
+        self.assertIs(self.win.active_terminal, second)
+
+    def test_search_advances_and_wraps_between_matches(self):
+        terminal = self.win.active_terminal
+        terminal.feed(b'\r\napple\r\nAPPLE\r\n')
+        self.win.search_entry.set_text('apple')
+        pump_until(self.win.find_text)
+        first = terminal.get_text_selected(Vte.Format.TEXT)
+        self.assertTrue(self.win.find_text())
+        second = terminal.get_text_selected(Vte.Format.TEXT)
+        self.assertNotEqual(first, second)
+        self.assertTrue(self.win.find_text())
+        self.assertEqual(first, terminal.get_text_selected(Vte.Format.TEXT))
+
+    def test_keyboard_pane_cycle_respects_nested_splits_and_tabs(self):
+        first = self.win.active_terminal
+        second = self.split()
+        third = self.split()
+        self.win.change_pane(1)
+        self.assertIs(self.win.active_terminal, first)
+        self.win.change_pane(1)
+        self.assertIs(self.win.active_terminal, second)
+        self.win.change_pane(-1)
+        self.assertIs(self.win.active_terminal, first)
+        self.win.change_pane(-1)
+        self.assertIs(self.win.active_terminal, third)
+        self.win.new_tab()
+        isolated = self.win.active_terminal
+        self.win.change_pane(1)
+        self.assertIs(self.win.active_terminal, isolated)
+
+    def test_search_status_and_selection_follow_focused_pane(self):
+        first = self.win.active_terminal
+        first.feed(b'\r\nunique-needle\r\n')
+        pump_until(lambda: first.get_cursor_position().row >= 1)
+        second = self.split()
+        self.win.open_search()
+        self.win.search_entry.set_text('unique-needle')
+        self.assertFalse(self.win.find_text())
+        self.assertEqual(self.win.search_status.get_text(), 'No matches')
+        self.win.change_pane(-1)
+        self.assertIs(self.win.active_terminal, first)
+        self.assertEqual(self.win.search_status.get_text(), '')
+        self.assertEqual(first.get_text_selected(Vte.Format.TEXT), 'unique-needle')
+        self.assertIsNone(second.search_get_regex())
+
+    def test_empty_and_closed_search_clear_vte_regex(self):
+        terminal = self.win.active_terminal
+        self.win.open_search()
+        self.win.search_entry.set_text('needle')
+        self.assertIsNotNone(terminal.search_get_regex())
+        self.win.search_entry.set_text('')
+        self.assertIsNone(terminal.search_get_regex())
+        self.win.search_entry.set_text('needle')
+        self.win.close_search()
+        self.assertIsNone(terminal.search_get_regex())
+        self.assertIsNone(self.win.search_terminal)
+        self.win.open_search()
+        self.assertIsNotNone(terminal.search_get_regex())
+
+    def test_search_cache_does_not_own_terminal(self):
+        terminal = self.win.active_terminal
+        self.win.search_entry.set_text('needle')
+        self.assertIsInstance(self.win.search_terminal, weakref.ReferenceType)
+        self.assertIs(self.win.search_terminal(), terminal)
+
+
+    def tracked_new_tab(self):
+        spawned_pids = []
+        original = self.win.spawned
+
+        def spawned(terminal, pid, error, data):
+            if not error:
+                spawned_pids.append(pid)
+            original(terminal, pid, error, data)
+
+        self.win.spawned = spawned
+        try:
+            self.win.new_tab()
+            pump_until(lambda: bool(spawned_pids))
+        finally:
+            self.win.spawned = original
+        return self.win.active_terminal, spawned_pids[0]
+
+    def test_closing_tab_terminates_idle_shell(self):
+        terminal, pid = self.tracked_new_tab()
+        terminal_ref = weakref.ref(terminal)
+        self.win.close_active()
+        del terminal
+        pump_until(lambda: terminal_ref() is None and not os.path.exists(f'/proc/{pid}'))
+
+    def test_closing_tab_terminates_foreground_process(self):
+        terminal, shell_pid = self.tracked_new_tab()
+        terminal.feed_child(b'sleep 60\n')
+        pump_until(lambda: os.tcgetpgrp(terminal.get_pty().get_fd()) > 0
+                   and os.tcgetpgrp(terminal.get_pty().get_fd()) != shell_pid)
+        foreground_pid = os.tcgetpgrp(terminal.get_pty().get_fd())
+        self.win.close_active()
+        del terminal
+        pump_until(lambda: not os.path.exists(f'/proc/{shell_pid}')
+                   and not os.path.exists(f'/proc/{foreground_pid}'))
 
 
 if __name__ == '__main__':

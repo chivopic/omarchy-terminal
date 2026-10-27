@@ -12,7 +12,8 @@ A small, native terminal inspired by the everyday workflow of iTerm2, built for 
 
 - Tabs, with drag-to-reorder and shell-provided titles
 - Horizontal and vertical splits, including nested splits
-- Copy, paste, scrollback and font zoom
+- Copy, paste, scrollback, font zoom and search in the focused pane
+- Keyboard navigation between panes
 - New tabs and splits start in the focused pane's directory when the shell reports it via OSC 7; otherwise they start in your home directory
 - Native GTK window, usable on Wayland and X11
 
@@ -31,7 +32,7 @@ Clone the repository and start the application:
 ```sh
 git clone https://github.com/chivopic/omarchy-terminal.git
 cd omarchy-terminal
-/usr/bin/python omarchy_terminal.py
+/usr/bin/python chiterm.py
 ```
 
 Use the system Python because the packages above provide its GTK and VTE bindings. The application uses `$SHELL` when it points to an executable file, falling back to `/bin/sh` otherwise. The GTK theme follows your desktop settings; terminal colors currently use VTE defaults.
@@ -48,7 +49,7 @@ Use the **+** button or the header menu to open a tab. Click a pane to focus it,
 
 - There is no confirmation before closing a pane or window, even when a command is running.
 - Tabs and panes are not restored after the application exits.
-- Profiles, terminal search, and automatic Omarchy terminal color synchronization are not implemented.
+- Profiles and automatic Omarchy terminal color synchronization are not implemented.
 
 ## Troubleshooting
 
@@ -59,7 +60,7 @@ Use the **+** button or the header menu to open a tab. Click a pane to focus it,
 
 ## Roadmap
 
-Next up: dependable pane focus and safer closing, followed by search, keyboard navigation, and Omarchy theme integration. See the [roadmap](ROADMAP.md#english) for priorities and current status.
+Next up: safer closing, repeatable checks, and Omarchy theme integration. See the [roadmap](ROADMAP.md#english) for priorities and current status.
 
 ## Contributing
 
@@ -75,6 +76,9 @@ Bug reports and focused pull requests are welcome. See [CONTRIBUTING.md](CONTRIB
 | Ctrl+Shift+W | Close focused pane (or tab) |
 | Ctrl+Shift+C | Copy selection |
 | Ctrl+Shift+V | Paste |
+| Ctrl+Shift+F | Search the focused pane |
+| Ctrl+Shift+G / Ctrl+Shift+Alt+G | Next / previous match |
+| Ctrl+Shift+] / Ctrl+Shift+[ | Next / previous pane |
 | Ctrl+Page Up | Previous tab |
 | Ctrl+Page Down | Next tab |
 | Ctrl++ or Ctrl+= | Zoom in |
@@ -82,16 +86,6 @@ Bug reports and focused pull requests are welcome. See [CONTRIBUTING.md](CONTRIB
 | Ctrl+0 | Reset zoom |
 
 Closing a pane or window ends its shell and any foreground process; save your work first. Click a pane to focus it. The menu in the header exposes the same main actions.
-
-## Tests
-
-With the dependencies above and a running graphical session, run:
-
-```sh
-/usr/bin/python -m unittest discover -s tests -v
-```
-
-These GTK integration tests launch `/bin/sh` in real VTE panes and exercise tab focus, shell exits, nested splits, and titles. They need a GTK display; they can also run with GTK's Broadway backend on a headless machine.
 
 ## License
 
