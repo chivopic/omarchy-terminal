@@ -30,7 +30,7 @@ cd omarchy-terminal
 /usr/bin/python omarchy_terminal.py
 ```
 
-The application uses `$SHELL`, falling back to `/bin/sh`. The GTK theme follows your desktop settings; terminal colors currently use VTE defaults.
+Use the system Python because the packages above provide its GTK and VTE bindings. The application uses `$SHELL` when it points to an executable file, falling back to `/bin/sh` otherwise. The GTK theme follows your desktop settings; terminal colors currently use VTE defaults.
 
 ## Shortcuts
 

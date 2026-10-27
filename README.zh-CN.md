@@ -30,7 +30,7 @@ cd omarchy-terminal
 /usr/bin/python omarchy_terminal.py
 ```
 
-应用使用 `$SHELL`，不可用时回退到 `/bin/sh`。GTK 界面跟随桌面设置；终端颜色目前使用 VTE 默认值。
+请使用系统 Python：上面的软件包为它提供 GTK 和 VTE 绑定。应用优先使用 `$SHELL` 指向的可执行文件，不可用时回退到 `/bin/sh`。GTK 界面跟随桌面设置；终端颜色目前使用 VTE 默认值。
 
 ## 快捷键
 
