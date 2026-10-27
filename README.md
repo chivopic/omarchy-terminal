@@ -1,5 +1,7 @@
 # Omarchy Terminal
 
+English | [简体中文](README.zh-CN.md)
+
 A small, native terminal inspired by the everyday workflow of iTerm2, built for Omarchy and other Linux desktops. It uses GTK 4 and VTE, so each pane runs a real shell with terminal applications, colors and scrollback.
 
 ## MVP
