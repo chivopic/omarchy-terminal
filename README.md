@@ -48,9 +48,13 @@ Use the **+** button or the header menu to open a tab. Click a pane to focus it,
 | Ctrl+Shift+D | Split left/right |
 | Ctrl+Shift+E | Split top/bottom |
 | Ctrl+Shift+W | Close focused pane (or tab) |
-| Ctrl+Shift+C / V | Copy / paste |
-| Ctrl+Page Up / Down | Previous / next tab |
-| Ctrl++ / Ctrl+- / Ctrl+0 | Zoom in / out / reset |
+| Ctrl+Shift+C | Copy selection |
+| Ctrl+Shift+V | Paste |
+| Ctrl+Page Up | Previous tab |
+| Ctrl+Page Down | Next tab |
+| Ctrl++ or Ctrl+= | Zoom in |
+| Ctrl+- | Zoom out |
+| Ctrl+0 | Reset zoom |
 
 Closing a pane or window ends its shell and any foreground process; save your work first. Click a pane to focus it. The menu in the header exposes the same main actions.
 

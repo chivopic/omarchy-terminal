@@ -48,9 +48,13 @@ cd omarchy-terminal
 | Ctrl+Shift+D | 左右分屏 |
 | Ctrl+Shift+E | 上下分屏 |
 | Ctrl+Shift+W | 关闭当前面板（或标签） |
-| Ctrl+Shift+C / V | 复制 / 粘贴 |
-| Ctrl+Page Up / Down | 上一个 / 下一个标签 |
-| Ctrl++ / Ctrl+- / Ctrl+0 | 放大 / 缩小 / 重置字体 |
+| Ctrl+Shift+C | 复制选中内容 |
+| Ctrl+Shift+V | 粘贴 |
+| Ctrl+Page Up | 上一个标签 |
+| Ctrl+Page Down | 下一个标签 |
+| Ctrl++ 或 Ctrl+= | 放大字体 |
+| Ctrl+- | 缩小字体 |
+| Ctrl+0 | 重置字体大小 |
 
 关闭面板或窗口会结束其中的 shell 和前台进程，请先保存工作。点击面板可切换焦点，标题栏菜单也提供主要操作。
 
