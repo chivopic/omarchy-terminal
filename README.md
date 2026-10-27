@@ -12,7 +12,9 @@ A small, native terminal inspired by the everyday workflow of iTerm2, built for 
 
 - Tabs, with drag-to-reorder and shell-provided titles
 - Horizontal and vertical splits, including nested splits
-- Copy, paste, scrollback and font zoom
+- Copy, paste, scrollback, literal search and font zoom
+- Keyboard pane navigation and a focused-pane indicator
+- Close confirmation and automatic Omarchy terminal palette updates
 - New tabs and splits start in the focused pane's directory when the shell reports it via OSC 7; otherwise they start in your home directory
 - Native GTK window, usable on Wayland and X11
 
@@ -20,7 +22,7 @@ This is an early MVP, not a complete iTerm2 replacement. See [Current limitation
 
 ## Run
 
-On Omarchy / Arch Linux, install the system dependencies if needed:
+Chiterm needs Python 3.11+, GTK 4.10+ and VTE’s GTK 4 bindings. On Omarchy / Arch Linux, install the system dependencies if needed:
 
 ```sh
 sudo pacman -S python python-gobject gtk4 vte4
@@ -34,7 +36,7 @@ cd omarchy-terminal
 /usr/bin/python chiterm.py
 ```
 
-Use the system Python because the packages above provide its GTK and VTE bindings. The application uses `$SHELL` when it points to an executable file, falling back to `/bin/sh` otherwise. The GTK theme follows your desktop settings; terminal colors currently use VTE defaults.
+Use the system Python because the packages above provide its GTK and VTE bindings. The application uses `$SHELL` when it points to an executable file, falling back to `/bin/sh` otherwise. The GTK theme follows your desktop settings. Chiterm reads the active Omarchy colors and checks for changes every two seconds. Outside Omarchy, or when no complete palette is available at startup, VTE defaults are used.
 
 ## Working directories
 
@@ -46,9 +48,9 @@ Use the **+** button or the header menu to open a tab. Click a pane to focus it,
 
 ## Current limitations
 
-- There is no confirmation before closing a pane or window, even when a command is running.
+- Closing a pane or window always asks for confirmation; it does not detect whether a command is running.
 - Tabs and panes are not restored after the application exits.
-- Profiles, terminal search, and automatic Omarchy terminal color synchronization are not implemented.
+- Profiles and session restoration are not implemented. Search is literal and case-insensitive; VTE search may not step through multiple matches on the same line.
 
 ## Troubleshooting
 
@@ -59,7 +61,7 @@ Use the **+** button or the header menu to open a tab. Click a pane to focus it,
 
 ## Roadmap
 
-Next up: dependable pane focus and safer closing, followed by search, keyboard navigation, and Omarchy theme integration. See the [roadmap](ROADMAP.md#english) for priorities and current status.
+Next up: stronger terminal integration, settings, packaging, and workspace restoration. See the [roadmap](ROADMAP.md#english) for priorities and current status.
 
 ## Contributing
 
@@ -73,6 +75,10 @@ Bug reports and focused pull requests are welcome. See [CONTRIBUTING.md](CONTRIB
 | Ctrl+Shift+D | Split left/right |
 | Ctrl+Shift+E | Split top/bottom |
 | Ctrl+Shift+W | Close focused pane (or tab) |
+| Ctrl+Shift+Left / Right | Previous / next pane |
+| Ctrl+Shift+F | Find in focused pane |
+| Ctrl+Shift+G | Find next |
+| Ctrl+Shift+Alt+G | Find previous |
 | Ctrl+Shift+C | Copy selection |
 | Ctrl+Shift+V | Paste |
 | Ctrl+Page Up | Previous tab |
@@ -81,7 +87,7 @@ Bug reports and focused pull requests are welcome. See [CONTRIBUTING.md](CONTRIB
 | Ctrl+- | Zoom out |
 | Ctrl+0 | Reset zoom |
 
-Closing a pane or window ends its shell and any foreground process; save your work first. Click a pane to focus it. The menu in the header exposes the same main actions.
+Closing a pane or window may terminate its shell and foreground process; save your work first. Click a pane to focus it. The menu in the header exposes the same main actions.
 
 ## Tests
 
@@ -91,7 +97,7 @@ With the dependencies above and a running graphical session, run:
 /usr/bin/python -m unittest discover -s tests -v
 ```
 
-These GTK integration tests launch `/bin/sh` in real VTE panes and exercise tab focus, shell exits, nested splits, and titles. They need a GTK display; they can also run with GTK's Broadway backend on a headless machine.
+These GTK integration tests launch `/bin/sh` in real VTE panes and exercise tab focus, shell exits, nested splits, search, confirmation, and themes. They need a GTK display; they can also run with GTK's Broadway backend on a headless machine.
 
 ## License
 

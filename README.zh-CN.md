@@ -12,7 +12,9 @@
 
 - 标签页：支持拖动排序和 shell 提供的标题
 - 左右、上下分屏，支持嵌套
-- 复制、粘贴、滚动回看和字体缩放
+- 复制、粘贴、滚动回看、文字搜索和字体缩放
+- 键盘切换面板，并高亮当前面板
+- 关闭确认和 Omarchy 终端配色自动更新
 - 当 shell 通过 OSC 7 报告当前目录时，新标签和分屏会继承聚焦面板的目录；否则从主目录启动
 - 原生 GTK 窗口，支持 Wayland 和 X11
 
@@ -20,7 +22,7 @@
 
 ## 运行
 
-在 Omarchy / Arch Linux 上，如果缺少依赖，请先安装：
+Chiterm 需要 Python 3.11+、GTK 4.10+ 和 VTE 的 GTK 4 绑定。在 Omarchy / Arch Linux 上，如果缺少依赖，请先安装：
 
 ```sh
 sudo pacman -S python python-gobject gtk4 vte4
@@ -34,7 +36,7 @@ cd omarchy-terminal
 /usr/bin/python chiterm.py
 ```
 
-请使用系统 Python：上面的软件包为它提供 GTK 和 VTE 绑定。应用优先使用 `$SHELL` 指向的可执行文件，不可用时回退到 `/bin/sh`。GTK 界面跟随桌面设置；终端颜色目前使用 VTE 默认值。
+请使用系统 Python：上面的软件包为它提供 GTK 和 VTE 绑定。应用优先使用 `$SHELL` 指向的可执行文件，不可用时回退到 `/bin/sh`。GTK 界面跟随桌面设置。Chiterm 会读取当前 Omarchy 配色，并每两秒检查是否变化；在非 Omarchy 环境或启动时没有完整配色时使用 VTE 默认值。
 
 ## 工作目录
 
@@ -46,9 +48,9 @@ cd omarchy-terminal
 
 ## 当前限制
 
-- 关闭面板或窗口前不会确认，即使其中有命令正在运行。
+- 关闭面板或窗口时总会请求确认，目前不会检测是否有命令正在运行。
 - 应用退出后不会恢复标签和面板。
-- 尚未实现配置档、终端搜索和 Omarchy 终端配色自动同步。
+- 尚未实现配置档和会话恢复。搜索为不区分大小写的纯文本搜索；VTE 搜索可能无法逐个跳转同一行中的多个匹配项。
 
 ## 常见问题
 
@@ -59,7 +61,7 @@ cd omarchy-terminal
 
 ## 路线图
 
-接下来优先完善面板焦点和安全关闭，再考虑搜索、键盘导航和 Omarchy 主题集成。优先级和当前状态详见[路线图](ROADMAP.md#简体中文)。
+接下来优先完善终端集成、设置、安装方式和工作区恢复。优先级和当前状态详见[路线图](ROADMAP.md#简体中文)。
 
 ## 参与贡献
 
@@ -73,6 +75,10 @@ cd omarchy-terminal
 | Ctrl+Shift+D | 左右分屏 |
 | Ctrl+Shift+E | 上下分屏 |
 | Ctrl+Shift+W | 关闭当前面板（或标签） |
+| Ctrl+Shift+Left / Right | 上一个 / 下一个面板 |
+| Ctrl+Shift+F | 搜索当前面板 |
+| Ctrl+Shift+G | 下一个匹配项 |
+| Ctrl+Shift+Alt+G | 上一个匹配项 |
 | Ctrl+Shift+C | 复制选中内容 |
 | Ctrl+Shift+V | 粘贴 |
 | Ctrl+Page Up | 上一个标签 |
@@ -81,7 +87,7 @@ cd omarchy-terminal
 | Ctrl+- | 缩小字体 |
 | Ctrl+0 | 重置字体大小 |
 
-关闭面板或窗口会结束其中的 shell 和前台进程，请先保存工作。点击面板可切换焦点，标题栏菜单也提供主要操作。
+关闭面板或窗口可能结束其中的 shell 和前台进程，请先保存工作。点击面板可切换焦点，标题栏菜单也提供主要操作。
 
 ## 许可证
 
