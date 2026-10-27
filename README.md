@@ -22,9 +22,11 @@ On Omarchy / Arch Linux, install the system dependencies if needed:
 sudo pacman -S python python-gobject gtk4 vte4
 ```
 
-Then run:
+Clone the repository and start the application:
 
 ```sh
+git clone https://github.com/chivopic/omarchy-terminal.git
+cd omarchy-terminal
 /usr/bin/python omarchy_terminal.py
 ```
 

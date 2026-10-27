@@ -22,9 +22,11 @@
 sudo pacman -S python python-gobject gtk4 vte4
 ```
 
-然后运行：
+克隆仓库并启动应用：
 
 ```sh
+git clone https://github.com/chivopic/omarchy-terminal.git
+cd omarchy-terminal
 /usr/bin/python omarchy_terminal.py
 ```
 
