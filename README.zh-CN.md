@@ -57,6 +57,10 @@ cd omarchy-terminal
 - **窗口没有打开**：在正在运行的 Wayland 或 X11 桌面会话中启动，并查看启动终端里的错误信息。
 - **新面板打开在主目录**：检查 shell 是否通过 OSC 7 报告当前目录。
 
+## 路线图
+
+接下来优先完善面板焦点和安全关闭，再考虑搜索、键盘导航和 Omarchy 主题集成。优先级和当前状态详见[路线图](ROADMAP.md#简体中文)。
+
 ## 参与贡献
 
 欢迎提交 bug 报告和范围清晰的 PR，详见 [CONTRIBUTING.md](CONTRIBUTING.md)。

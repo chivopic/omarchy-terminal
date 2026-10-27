@@ -57,6 +57,10 @@ Use the **+** button or the header menu to open a tab. Click a pane to focus it,
 - **No window opens**: start the application from a running Wayland or X11 desktop session and read any error printed in the launching terminal.
 - **A new pane opens in your home directory**: check whether your shell reports its directory through OSC 7.
 
+## Roadmap
+
+Next up: dependable pane focus and safer closing, followed by search, keyboard navigation, and Omarchy theme integration. See the [roadmap](ROADMAP.md#english) for priorities and current status.
+
 ## Contributing
 
 Bug reports and focused pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
