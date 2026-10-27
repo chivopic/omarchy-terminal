@@ -8,7 +8,7 @@ from urllib.parse import unquote, urlparse
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Vte', '3.91')
-from gi.repository import Gdk, Gio, GLib, Gtk, Pango, Vte
+from gi.repository import Gio, GLib, Gtk, Pango, Vte
 
 APP_ID = 'io.github.chivopic.OmarchyTerminal'
 
@@ -30,6 +30,7 @@ class TerminalWindow(Gtk.ApplicationWindow):
         super().__init__(application=app, title='Omarchy Terminal')
         self.set_default_size(1000, 650)
         self.active_terminal = None
+        self.focused_by_page = {}
         self.font_scale = 1.0
         self.set_icon_name('utilities-terminal')
 
@@ -88,14 +89,18 @@ class TerminalWindow(Gtk.ApplicationWindow):
             terminal.feed(('\r\nCould not start shell: ' + str(error) + '\r\n').encode())
 
     def set_active(self, terminal):
+        page = self.page_for(terminal)
+        if page is not None:
+            self.focused_by_page[page] = terminal
         self.active_terminal = terminal
         self.update_title(terminal)
 
     def update_title(self, terminal):
         page = self.page_for(terminal)
-        if page:
+        if page and self.focused_by_page.get(page) == terminal:
             label = self.notebook.get_tab_label(page)
-            label.set_text((terminal.get_window_title() or 'Terminal')[:30])
+            if label:
+                label.set_text((terminal.get_window_title() or 'Terminal')[:30])
 
     def page_for(self, widget):
         for index in range(self.notebook.get_n_pages()):
@@ -145,6 +150,8 @@ class TerminalWindow(Gtk.ApplicationWindow):
         page = self.page_for(terminal)
         if page is None:
             return
+        selected_page = self.notebook.get_nth_page(self.notebook.get_current_page())
+        was_active = terminal == self.active_terminal
         parent = terminal.get_parent()
         if isinstance(parent, Gtk.Paned):
             sibling = parent.get_end_child() if parent.get_start_child() == terminal else parent.get_start_child()
@@ -159,32 +166,42 @@ class TerminalWindow(Gtk.ApplicationWindow):
             else:
                 grandparent.remove(parent)
                 grandparent.append(sibling)
-            self.focus_first(sibling)
+            if self.focused_by_page.get(page) == terminal:
+                self.focused_by_page[page] = self.first_terminal(sibling)
+            if page == selected_page and was_active:
+                self.focus_page(page)
         else:
             index = self.notebook.page_num(page)
+            self.focused_by_page.pop(page, None)
             self.notebook.remove_page(index)
             if self.notebook.get_n_pages() == 0:
                 self.active_terminal = None
                 self.close()
-            else:
+            elif page == selected_page:
                 self.focus_current_page()
 
-    def focus_first(self, widget):
+    def first_terminal(self, widget):
         if isinstance(widget, Vte.Terminal):
-            self.set_active(widget)
-            widget.grab_focus()
+            return widget
         elif isinstance(widget, Gtk.Paned):
-            self.focus_first(widget.get_start_child())
+            return self.first_terminal(widget.get_start_child())
         elif isinstance(widget, Gtk.Box):
-            self.focus_first(widget.get_first_child())
+            return self.first_terminal(widget.get_first_child())
+        return None
+
+    def focus_page(self, page):
+        terminal = self.focused_by_page.get(page) or self.first_terminal(page)
+        if terminal:
+            self.set_active(terminal)
+            terminal.grab_focus()
 
     def focus_current_page(self):
         page = self.notebook.get_nth_page(self.notebook.get_current_page())
         if page:
-            self.focus_first(page)
+            self.focus_page(page)
 
     def on_switch_page(self, _notebook, page, _index):
-        self.focus_first(page)
+        self.focus_page(page)
 
     def close_active(self):
         if self.active_terminal:
