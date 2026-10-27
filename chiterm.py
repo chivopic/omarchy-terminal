@@ -9,6 +9,7 @@ import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Vte', '3.91')
 from gi.repository import Gio, GLib, Gtk, Pango, Vte
+from chiterm_theme import read_theme, theme_path
 
 APP_ID = 'io.github.chivopic.Chiterm'
 # PCRE2 compile flags required by VTE: UTF, Unicode, multiline and caseless.
@@ -36,9 +37,13 @@ class TerminalWindow(Gtk.ApplicationWindow):
         self.search_terminal = None
         self.search_query = None
         self.confirmation_open = False
+        self.palette = read_theme(theme_path())
+        self.palette_key = self.theme_key(self.palette)
         self.font_scale = 1.0
         self.set_icon_name('utilities-terminal')
         self.connect('close-request', self.on_close_request)
+        self.theme_timer = GLib.timeout_add_seconds(2, self.refresh_theme)
+        self.connect('destroy', lambda *_: GLib.source_remove(self.theme_timer))
 
         container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.set_child(container)
@@ -105,6 +110,8 @@ class TerminalWindow(Gtk.ApplicationWindow):
         terminal.set_font(Pango.FontDescription.from_string('monospace 11'))
         terminal.set_font_scale(self.font_scale)
         terminal.set_mouse_autohide(True)
+        if self.palette:
+            terminal.set_colors(*self.palette)
         terminal.connect('child-exited', lambda term, _status: self.remove_terminal(term))
         terminal.connect('window-title-changed', self.update_title)
         focus = Gtk.EventControllerFocus()
@@ -120,6 +127,24 @@ class TerminalWindow(Gtk.ApplicationWindow):
     def spawned(self, terminal, pid, error, _data):
         if error:
             terminal.feed(('\r\nCould not start shell: ' + str(error) + '\r\n').encode())
+
+    @staticmethod
+    def theme_key(palette):
+        if palette is None:
+            return None
+        foreground, background, colors = palette
+        return tuple(color.to_string() for color in (foreground, background, *colors))
+
+    def refresh_theme(self):
+        palette = read_theme(theme_path())
+        key = self.theme_key(palette)
+        # Keep the last valid palette while Omarchy replaces its theme directory.
+        if palette and key != self.palette_key:
+            self.palette, self.palette_key = palette, key
+            for index in range(self.notebook.get_n_pages()):
+                for terminal in self.terminals_in(self.notebook.get_nth_page(index)):
+                    terminal.set_colors(*palette)
+        return True
 
     def set_active(self, terminal):
         page = self.page_for(terminal)

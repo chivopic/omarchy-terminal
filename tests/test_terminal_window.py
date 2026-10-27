@@ -1,10 +1,13 @@
 """GTK integration tests for pane and tab focus behavior."""
 import os
+from pathlib import Path
+import tempfile
 import time
 import unittest
 from unittest.mock import patch
 
 from chiterm import Application, GLib, Gtk, TerminalWindow, Vte
+from chiterm_theme import PALETTE_KEYS
 
 
 def pump_until(predicate, timeout=3):
@@ -183,6 +186,20 @@ class TerminalWindowTests(unittest.TestCase):
         isolated = self.win.active_terminal
         self.win.change_pane(1)
         self.assertIs(self.win.active_terminal, isolated)
+
+    def test_theme_refresh_keeps_last_valid_palette_during_replacement(self):
+        self.split()
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'colors.toml'
+            path.write_text('\n'.join(f'{key} = "#{index:02x}0000"' for index, key in enumerate(PALETTE_KEYS)))
+            with patch('chiterm.theme_path', return_value=path):
+                self.win.refresh_theme()
+                key = self.win.palette_key
+                self.assertIsNotNone(key)
+                self.win.new_tab()
+                path.write_text('unfinished = [')
+                self.win.refresh_theme()
+                self.assertEqual(self.win.palette_key, key)
 
 
 if __name__ == '__main__':
