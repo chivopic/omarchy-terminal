@@ -13,7 +13,7 @@
 - 标签页：支持拖动排序和 shell 提供的标题
 - 左右、上下分屏，支持嵌套
 - 复制、粘贴、滚动回看、字体缩放和当前面板搜索
-- 使用键盘切换面板
+- 使用键盘切换或临时最大化面板
 - 当 shell 通过 OSC 7 报告当前目录时，新标签和分屏会继承聚焦面板的目录；否则从主目录启动
 - 原生 GTK 窗口，支持 Wayland 和 X11
 
@@ -79,6 +79,7 @@ cd omarchy-terminal
 | Ctrl+Shift+F | 搜索当前面板 |
 | Ctrl+Shift+G / Ctrl+Shift+Alt+G | 下一个 / 上一个结果 |
 | Ctrl+Shift+] / Ctrl+Shift+[ | 下一个 / 上一个面板 |
+| Ctrl+Shift+Enter | 最大化 / 恢复当前面板 |
 | Ctrl+Page Up | 上一个标签 |
 | Ctrl+Page Down | 下一个标签 |
 | Ctrl++ 或 Ctrl+= | 放大字体 |

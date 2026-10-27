@@ -164,6 +164,45 @@ class TerminalWindowTests(unittest.TestCase):
         self.win.change_pane(1)
         self.assertIs(self.win.active_terminal, isolated)
 
+    def test_zoom_restores_nested_panes_without_restarting_shells(self):
+        first = self.win.active_terminal
+        second = self.split()
+        third = self.split()
+        page = self.win.page_for(third)
+        self.win.toggle_pane_zoom()
+        self.assertTrue(third.get_visible())
+        self.assertFalse(first.get_visible())
+        self.assertFalse(second.get_visible())
+        self.assertIsNotNone(first.get_pty())
+        self.assertIsNotNone(second.get_pty())
+        self.win.toggle_pane_zoom()
+        self.assertTrue(first.get_visible())
+        self.assertTrue(second.get_visible())
+        self.assertNotIn(page, self.win.maximized_by_page)
+        self.assertIs(self.win.active_terminal, third)
+
+    def test_zoom_is_per_tab_and_navigation_restores_layout(self):
+        first = self.win.active_terminal
+        second = self.split()
+        self.win.toggle_pane_zoom()
+        self.win.new_tab()
+        self.win.change_tab(-1)
+        self.assertFalse(first.get_visible())
+        self.assertIs(self.win.active_terminal, second)
+        self.win.change_pane(1)
+        self.assertTrue(first.get_visible())
+        self.assertIs(self.win.active_terminal, first)
+
+    def test_zoom_restores_before_hidden_pane_exits_or_new_split(self):
+        hidden = self.win.active_terminal
+        active = self.split()
+        self.win.toggle_pane_zoom()
+        self.exit_shell(hidden)
+        self.assertIs(self.win.active_terminal, active)
+        self.win.split(Gtk.Orientation.VERTICAL)
+        self.assertTrue(active.get_visible())
+        self.assertTrue(self.win.active_terminal.get_visible())
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -13,7 +13,7 @@ A small, native terminal inspired by the everyday workflow of iTerm2, built for 
 - Tabs, with drag-to-reorder and shell-provided titles
 - Horizontal and vertical splits, including nested splits
 - Copy, paste, scrollback, font zoom and search in the focused pane
-- Keyboard navigation between panes
+- Keyboard navigation and temporary maximization of panes
 - New tabs and splits start in the focused pane's directory when the shell reports it via OSC 7; otherwise they start in your home directory
 - Native GTK window, usable on Wayland and X11
 
@@ -79,6 +79,7 @@ Bug reports and focused pull requests are welcome. See [CONTRIBUTING.md](CONTRIB
 | Ctrl+Shift+F | Search the focused pane |
 | Ctrl+Shift+G / Ctrl+Shift+Alt+G | Next / previous match |
 | Ctrl+Shift+] / Ctrl+Shift+[ | Next / previous pane |
+| Ctrl+Shift+Enter | Maximize / restore the focused pane |
 | Ctrl+Page Up | Previous tab |
 | Ctrl+Page Down | Next tab |
 | Ctrl++ or Ctrl+= | Zoom in |
