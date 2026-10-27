@@ -32,6 +32,10 @@ cd omarchy-terminal
 
 Use the system Python because the packages above provide its GTK and VTE bindings. The application uses `$SHELL` when it points to an executable file, falling back to `/bin/sh` otherwise. The GTK theme follows your desktop settings; terminal colors currently use VTE defaults.
 
+## Working with panes and tabs
+
+Use the **+** button or the header menu to open a tab. Click a pane to focus it, then use the menu or shortcuts below to split it. Drag the divider to resize panes; drag a tab label to reorder tabs. Closing the last pane in a tab closes that tab.
+
 ## Shortcuts
 
 | Shortcut | Action |
