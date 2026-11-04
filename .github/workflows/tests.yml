@@ -1,0 +1,23 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install GTK and VTE test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            dbus-x11 gir1.2-gtk-4.0 gir1.2-vte-3.91 \
+            python3-gi xvfb xauth
+      - name: Run unit and real GTK/VTE tests
+        run: xvfb-run -a dbus-run-session -- make test-all
