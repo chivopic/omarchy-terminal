@@ -11,8 +11,10 @@ gi.require_version('Gdk', '4.0')
 gi.require_version('Gtk', '4.0')
 gi.require_version('Vte', '3.91')
 from gi.repository import Gdk, Gio, GLib, Gtk, Pango, Vte
+from config import ConfigStore
 from terminal_links import install_link_handler
 from terminal_search import build_search_pattern
+from themes import THEMES
 
 APP_ID = 'io.github.chivopic.Chiterm'
 
@@ -30,7 +32,7 @@ def current_directory(terminal):
 
 
 class TerminalWindow(Gtk.ApplicationWindow):
-    def __init__(self, app):
+    def __init__(self, app, config_store=None):
         super().__init__(application=app, title='Chiterm')
         self.set_default_size(1000, 650)
         self.active_terminal = None
@@ -41,6 +43,8 @@ class TerminalWindow(Gtk.ApplicationWindow):
         self.search_options = None
         self.confirmation_open = False
         self.font_scale = 1.0
+        self.config_store = config_store or ConfigStore()
+        self.current_theme = self.config_store.load_theme()
         self.set_icon_name('utilities-terminal')
         self.connect('close-request', self.on_close_request)
 
@@ -60,9 +64,23 @@ class TerminalWindow(Gtk.ApplicationWindow):
                               ('Copy', 'copy'), ('Paste', 'paste'), ('Find', 'find'), ('Zoom In', 'zoom-in'),
                               ('Zoom Out', 'zoom-out'), ('Reset Zoom', 'zoom-reset')]:
             menu.append(label, 'win.' + action)
+        theme_menu = Gio.Menu()
+        for theme_id, theme in THEMES.items():
+            item = Gio.MenuItem.new(theme.name, None)
+            item.set_action_and_target_value('win.theme', GLib.Variant.new_string(theme_id))
+            theme_menu.append_item(item)
+        menu.append_submenu('Theme', theme_menu)
         menu_button = Gtk.MenuButton(icon_name='open-menu-symbolic', menu_model=menu)
         header.pack_end(menu_button)
         container.append(header)
+        self.status_revealer = Gtk.Revealer()
+        self.status_revealer.set_transition_type(Gtk.RevealerTransitionType.SLIDE_DOWN)
+        self.status_label = Gtk.Label(xalign=0)
+        self.status_label.set_margin_start(10)
+        self.status_label.set_margin_top(5)
+        self.status_label.set_margin_bottom(5)
+        self.status_revealer.set_child(self.status_label)
+        container.append(self.status_revealer)
         self.search_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         self.search_bar.set_margin_top(6)
         self.search_bar.set_margin_bottom(6)
@@ -113,6 +131,11 @@ class TerminalWindow(Gtk.ApplicationWindow):
             action = Gio.SimpleAction.new(name, None)
             action.connect('activate', lambda _action, _param, cb=callback: cb())
             self.add_action(action)
+        theme_action = Gio.SimpleAction.new_stateful(
+            'theme', GLib.VariantType.new('s'), GLib.Variant.new_string(self.current_theme))
+        theme_action.connect('activate', self.on_theme_action)
+        self.add_action(theme_action)
+        self.theme_action = theme_action
         self.new_tab()
 
     def make_terminal(self, cwd):
@@ -121,6 +144,7 @@ class TerminalWindow(Gtk.ApplicationWindow):
         terminal.set_font(Pango.FontDescription.from_string('monospace 11'))
         terminal.set_font_scale(self.font_scale)
         terminal.set_mouse_autohide(True)
+        self.apply_theme_to_terminal(terminal)
         install_link_handler(terminal)
         terminal.connect('child-exited', lambda term, _status: self.remove_terminal(term))
         terminal.connect('window-title-changed', self.update_title)
@@ -137,6 +161,54 @@ class TerminalWindow(Gtk.ApplicationWindow):
     def spawned(self, terminal, pid, error, _data):
         if error:
             terminal.feed(('\r\nCould not start shell: ' + str(error) + '\r\n').encode())
+
+    def on_theme_action(self, _action, parameter):
+        self.set_theme(parameter.get_string())
+
+    def set_theme(self, theme_id):
+        if theme_id not in THEMES:
+            return
+        self.current_theme = theme_id
+        self.theme_action.set_state(GLib.Variant.new_string(theme_id))
+        for index in range(self.notebook.get_n_pages()):
+            page = self.notebook.get_nth_page(index)
+            for terminal in self.terminals_in(page):
+                self.apply_theme_to_terminal(terminal)
+        try:
+            self.config_store.save_theme(theme_id)
+        except OSError:
+            self.show_status('Theme changed for this session, but the preference could not be saved.')
+        else:
+            self.show_status('')
+
+    def show_status(self, message):
+        self.status_label.set_text(message)
+        self.status_revealer.set_reveal_child(bool(message))
+
+    @staticmethod
+    def rgba(value):
+        color = Gdk.RGBA()
+        if not color.parse(value):
+            raise ValueError(f'Invalid theme color: {value}')
+        return color
+
+    def apply_theme_to_terminal(self, terminal):
+        theme = THEMES[self.current_theme]
+        palette = [self.rgba(color) for color in theme.ansi]
+        terminal.set_colors(self.rgba(theme.foreground), self.rgba(theme.background), palette)
+        terminal.set_color_cursor(self.rgba(theme.cursor))
+        terminal.set_color_highlight(self.rgba(theme.selection_background))
+        terminal.set_color_highlight_foreground(self.rgba(theme.selection_foreground))
+
+    @staticmethod
+    def terminals_in(widget):
+        if isinstance(widget, Vte.Terminal):
+            yield widget
+            return
+        child = widget.get_first_child()
+        while child:
+            yield from TerminalWindow.terminals_in(child)
+            child = child.get_next_sibling()
 
     def set_active(self, terminal):
         changed = self.active_terminal is not terminal

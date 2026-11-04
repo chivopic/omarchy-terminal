@@ -1,11 +1,14 @@
 """GTK integration tests for pane and tab focus behavior."""
 import os
+import tempfile
 import time
 import unittest
 import weakref
 from unittest.mock import patch
 
 from chiterm import Application, Gdk, GLib, Gtk, TerminalWindow, Vte
+from config import ConfigStore
+from themes import THEMES
 
 
 def pump_until(predicate, timeout=3):
@@ -23,6 +26,9 @@ def pump_until(predicate, timeout=3):
 class TerminalWindowTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        if (os.environ.get('SKIP_GUI_TESTS') == '1'
+                and os.environ.get('REQUIRE_GUI_TESTS') != '1'):
+            raise unittest.SkipTest('GUI tests skipped by SKIP_GUI_TESTS; run make test-gui')
         display_available = Gtk.init_check() and Gdk.Display.get_default() is not None
         if not display_available:
             message = 'GTK display unavailable; GUI tests need Xvfb or a desktop session'
@@ -42,7 +48,9 @@ class TerminalWindowTests(unittest.TestCase):
             os.environ['SHELL'] = cls.original_shell
 
     def setUp(self):
-        self.win = TerminalWindow(self.app)
+        self.config_tmp = tempfile.TemporaryDirectory()
+        self.config_store = ConfigStore(os.path.join(self.config_tmp.name, 'config.json'))
+        self.win = TerminalWindow(self.app, config_store=self.config_store)
         self.win.present()
         pump_until(lambda: self.win.active_terminal.get_pty() is not None)
 
@@ -50,6 +58,7 @@ class TerminalWindowTests(unittest.TestCase):
         self.win.destroy()
         while GLib.MainContext.default().iteration(False):
             pass
+        self.config_tmp.cleanup()
 
     def split(self):
         self.win.split(Gtk.Orientation.HORIZONTAL)
@@ -177,6 +186,57 @@ class TerminalWindowTests(unittest.TestCase):
         self.win.search_entry.set_text('(')
         self.assertFalse(self.win.find_text())
         self.assertEqual(self.win.search_status.get_text(), 'Invalid regular expression')
+
+    def test_theme_changes_all_panes_without_restarting_shells(self):
+        first = self.win.active_terminal
+        second = self.split()
+        first_pty, second_pty = first.get_pty(), second.get_pty()
+        first_process, second_process = (os.tcgetpgrp(first_pty.get_fd()),
+                                         os.tcgetpgrp(second_pty.get_fd()))
+        self.win.toggle_pane_zoom()
+        self.assertFalse(first.get_visible())
+        self.win.new_tab()
+        background_tab_terminal = self.win.active_terminal
+        pump_until(lambda: background_tab_terminal.get_pty() is not None)
+        background_process = os.tcgetpgrp(background_tab_terminal.get_pty().get_fd())
+
+        self.win.lookup_action('theme').activate(GLib.Variant.new_string('paper-bloom'))
+
+        self.assertEqual(self.win.theme_action.get_state().get_string(), 'paper-bloom')
+        self.assertEqual(os.tcgetpgrp(first.get_pty().get_fd()), first_process)
+        self.assertEqual(os.tcgetpgrp(second.get_pty().get_fd()), second_process)
+        self.assertEqual(os.tcgetpgrp(background_tab_terminal.get_pty().get_fd()), background_process)
+        expected = self.win.rgba(THEMES['paper-bloom'].background)
+        for terminal in (first, second, background_tab_terminal):
+            color = terminal.get_color_background_for_draw()
+            self.assertAlmostEqual(color.red, expected.red, places=3)
+            self.assertAlmostEqual(color.green, expected.green, places=3)
+            self.assertAlmostEqual(color.blue, expected.blue, places=3)
+
+    def test_new_pane_inherits_and_persists_selected_theme(self):
+        self.win.lookup_action('theme').activate(GLib.Variant.new_string('harbor-dusk'))
+        new_window = TerminalWindow(self.app, config_store=self.config_store)
+        try:
+            self.assertEqual(new_window.current_theme, 'harbor-dusk')
+            self.assertEqual(self.config_store.load_theme(), 'harbor-dusk')
+        finally:
+            new_window.destroy()
+
+        self.win.split(Gtk.Orientation.HORIZONTAL)
+        terminal = self.win.active_terminal
+        pump_until(lambda: terminal.get_pty() is not None)
+        expected = self.win.rgba(THEMES['harbor-dusk'].background)
+        color = terminal.get_color_background_for_draw()
+        self.assertAlmostEqual(color.red, expected.red, places=3)
+        self.assertAlmostEqual(color.green, expected.green, places=3)
+        self.assertAlmostEqual(color.blue, expected.blue, places=3)
+
+    def test_theme_save_failure_is_visible_and_keeps_session_theme(self):
+        with patch.object(self.config_store, 'save_theme', side_effect=OSError('read only')):
+            self.win.set_theme('sage-ledger')
+        self.assertEqual(self.win.current_theme, 'sage-ledger')
+        self.assertTrue(self.win.status_revealer.get_reveal_child())
+        self.assertIn('could not be saved', self.win.status_label.get_text())
 
     def test_search_keyboard_escape_and_shift_enter(self):
         terminal = self.win.active_terminal
