@@ -2,17 +2,19 @@
 """Chiterm: a native terminal powered by GTK 4 and VTE."""
 import os
 import sys
+import weakref
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 import gi
+gi.require_version('Gdk', '4.0')
 gi.require_version('Gtk', '4.0')
 gi.require_version('Vte', '3.91')
-from gi.repository import Gio, GLib, Gtk, Pango, Vte
+from gi.repository import Gdk, Gio, GLib, Gtk, Pango, Vte
+from terminal_links import install_link_handler
+from terminal_search import build_search_pattern
 
 APP_ID = 'io.github.chivopic.Chiterm'
-# PCRE2 compile flags required by VTE: UTF, Unicode, multiline and caseless.
-SEARCH_FLAGS = 0x00080000 | 0x00020000 | 0x00000400 | 0x00000008
 
 
 def current_directory(terminal):
@@ -33,10 +35,14 @@ class TerminalWindow(Gtk.ApplicationWindow):
         self.set_default_size(1000, 650)
         self.active_terminal = None
         self.focused_by_page = {}
+        self.maximized_by_page = {}
         self.search_terminal = None
         self.search_query = None
+        self.search_options = None
+        self.confirmation_open = False
         self.font_scale = 1.0
         self.set_icon_name('utilities-terminal')
+        self.connect('close-request', self.on_close_request)
 
         container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.set_child(container)
@@ -50,6 +56,7 @@ class TerminalWindow(Gtk.ApplicationWindow):
         for label, action in [('New Tab', 'new-tab'), ('Split Left / Right', 'split-right'),
                               ('Split Top / Bottom', 'split-down'), ('Close Pane', 'close-pane'),
                               ('Next Pane', 'next-pane'), ('Previous Pane', 'previous-pane'),
+                              ('Toggle Pane Zoom', 'toggle-pane-zoom'),
                               ('Copy', 'copy'), ('Paste', 'paste'), ('Find', 'find'), ('Zoom In', 'zoom-in'),
                               ('Zoom Out', 'zoom-out'), ('Reset Zoom', 'zoom-reset')]:
             menu.append(label, 'win.' + action)
@@ -64,7 +71,17 @@ class TerminalWindow(Gtk.ApplicationWindow):
         self.search_entry = Gtk.SearchEntry(hexpand=True, placeholder_text='Find in current pane')
         self.search_entry.connect('changed', lambda *_: self.find_text())
         self.search_entry.connect('activate', lambda *_: self.find_text())
+        self.search_entry.add_controller(self.search_key_controller())
         self.search_bar.append(self.search_entry)
+        self.case_mode = Gtk.DropDown.new_from_strings(
+            ['Smart Case', 'Case Sensitive', 'Ignore Case'])
+        self.case_mode.set_tooltip_text('Search case mode')
+        self.case_mode.connect('notify::selected', lambda *_: self.find_text())
+        self.search_bar.append(self.case_mode)
+        self.regex_toggle = Gtk.CheckButton(label='.*')
+        self.regex_toggle.set_tooltip_text('Use a regular expression')
+        self.regex_toggle.connect('toggled', lambda *_: self.find_text())
+        self.search_bar.append(self.regex_toggle)
         self.search_status = Gtk.Label(label='')
         self.search_bar.append(self.search_status)
         for icon, tooltip, callback in [
@@ -89,6 +106,7 @@ class TerminalWindow(Gtk.ApplicationWindow):
             'find-previous': lambda: self.find_text(previous=True),
             'next-pane': lambda: self.change_pane(1),
             'previous-pane': lambda: self.change_pane(-1),
+            'toggle-pane-zoom': self.toggle_pane_zoom,
             'zoom-out': lambda: self.zoom(-0.1), 'zoom-reset': lambda: self.zoom(None),
             'next-tab': lambda: self.change_tab(1), 'previous-tab': lambda: self.change_tab(-1),
         }.items():
@@ -103,10 +121,11 @@ class TerminalWindow(Gtk.ApplicationWindow):
         terminal.set_font(Pango.FontDescription.from_string('monospace 11'))
         terminal.set_font_scale(self.font_scale)
         terminal.set_mouse_autohide(True)
+        install_link_handler(terminal)
         terminal.connect('child-exited', lambda term, _status: self.remove_terminal(term))
         terminal.connect('window-title-changed', self.update_title)
         focus = Gtk.EventControllerFocus()
-        focus.connect('enter', lambda *_: self.set_active(terminal))
+        focus.connect('enter', lambda controller: self.set_active(controller.get_widget()))
         terminal.add_controller(focus)
         shell = os.environ.get('SHELL') or '/bin/sh'
         if not os.path.isfile(shell) or not os.access(shell, os.X_OK):
@@ -120,11 +139,14 @@ class TerminalWindow(Gtk.ApplicationWindow):
             terminal.feed(('\r\nCould not start shell: ' + str(error) + '\r\n').encode())
 
     def set_active(self, terminal):
+        changed = self.active_terminal is not terminal
         page = self.page_for(terminal)
         if page is not None:
             self.focused_by_page[page] = terminal
         self.active_terminal = terminal
         self.update_title(terminal)
+        if changed and self.search_bar.get_visible():
+            self.find_text()
 
     def update_title(self, terminal):
         page = self.page_for(terminal)
@@ -155,6 +177,7 @@ class TerminalWindow(Gtk.ApplicationWindow):
         old = self.active_terminal
         if not old or not self.page_for(old):
             return
+        self.restore_pane_zoom(self.page_for(old))
         parent = old.get_parent()
         new = self.make_terminal(current_directory(old))
         if isinstance(parent, Gtk.Paned):
@@ -181,6 +204,7 @@ class TerminalWindow(Gtk.ApplicationWindow):
         page = self.page_for(terminal)
         if page is None:
             return
+        self.restore_pane_zoom(page)
         selected_page = self.notebook.get_nth_page(self.notebook.get_current_page())
         was_active = terminal == self.active_terminal
         parent = terminal.get_parent()
@@ -235,8 +259,37 @@ class TerminalWindow(Gtk.ApplicationWindow):
         self.focus_page(page)
 
     def close_active(self):
-        if self.active_terminal:
-            self.remove_terminal(self.active_terminal)
+        terminal = self.active_terminal
+        if terminal:
+            self.confirm_close('Close this pane?', lambda confirmed:
+                               self.remove_terminal(terminal) if confirmed else None)
+
+    def on_close_request(self, _window):
+        if self.notebook.get_n_pages() == 0:
+            return False
+        self.confirm_close('Close this window?', lambda confirmed:
+                           self.destroy() if confirmed else None)
+        return True
+
+    def confirm_close(self, message, callback):
+        if self.confirmation_open:
+            return
+        self.confirmation_open = True
+        dialog = Gtk.AlertDialog.new(message)
+        dialog.set_detail('Running commands in the affected terminals will be stopped.')
+        dialog.set_buttons(['Cancel', 'Close'])
+        dialog.set_cancel_button(0)
+        dialog.set_default_button(0)
+
+        def done(dialog, result, _data):
+            self.confirmation_open = False
+            try:
+                confirmed = dialog.choose_finish(result) == 1
+            except GLib.Error:
+                confirmed = False
+            callback(confirmed)
+
+        dialog.choose(self, None, done, None)
 
     def copy(self):
         if self.active_terminal:
@@ -248,29 +301,68 @@ class TerminalWindow(Gtk.ApplicationWindow):
 
     def open_search(self):
         self.search_bar.set_visible(True)
+        if self.search_entry.get_text():
+            self.find_text()
         self.search_entry.grab_focus()
+
+    def search_key_controller(self):
+        controller = Gtk.EventControllerKey()
+        # Handle Shift+Enter before the entry's default activation handler.
+        controller.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        controller.connect('key-pressed', self.on_search_key_pressed)
+        return controller
+
+    def on_search_key_pressed(self, _controller, keyval, _keycode, state):
+        if keyval == Gdk.KEY_Escape:
+            self.close_search()
+            return True
+        if keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter) and state & Gdk.ModifierType.SHIFT_MASK:
+            self.find_text(previous=True)
+            return True
+        if keyval == Gdk.KEY_F3:
+            self.find_text(previous=bool(state & Gdk.ModifierType.SHIFT_MASK))
+            return True
+        return False
 
     def close_search(self):
         self.search_bar.set_visible(False)
+        self.clear_search()
         self.search_status.set_text('')
         if self.active_terminal:
             self.active_terminal.grab_focus()
+
+    def clear_search(self):
+        terminal = self.search_terminal() if self.search_terminal else None
+        if terminal is not None:
+            terminal.search_set_regex(None, 0)
+        self.search_terminal = None
+        self.search_query = None
+        self.search_options = None
 
     def find_text(self, previous=False):
         terminal = self.active_terminal
         query = self.search_entry.get_text()
         if not terminal or not query:
-            self.search_terminal = None
-            self.search_query = None
+            self.clear_search()
             self.search_status.set_text('')
             return False
-        if self.search_terminal != terminal or self.search_query != query:
-            # Escape user input so that search is literal, including punctuation.
-            pattern = GLib.regex_escape_string(query, -1)
-            regex = Vte.Regex.new_for_search(pattern, -1, SEARCH_FLAGS)
+        searched = self.search_terminal() if self.search_terminal else None
+        case_mode = self.case_mode.get_selected()
+        options = (case_mode, self.regex_toggle.get_active())
+        if searched is not terminal or self.search_query != query or self.search_options != options:
+            self.clear_search()
+            # Regex mode reports compile errors in the status label instead of
+            # losing the UI; pattern escaping and case flags are pure logic.
+            try:
+                pattern, flags = build_search_pattern(query, case_mode, options[1])
+                regex = Vte.Regex.new_for_search(pattern, -1, flags)
+            except (GLib.Error, ValueError):
+                self.search_status.set_text('Invalid regular expression')
+                return False
             terminal.search_set_regex(regex, 0)
             terminal.search_set_wrap_around(True)
-            self.search_terminal, self.search_query = terminal, query
+            self.search_terminal, self.search_query = weakref.ref(terminal), query
+            self.search_options = options
         found = terminal.search_find_previous() if previous else terminal.search_find_next()
         self.search_status.set_text('' if found else 'No matches')
         return found
@@ -291,6 +383,33 @@ class TerminalWindow(Gtk.ApplicationWindow):
         if count:
             self.notebook.set_current_page((self.notebook.get_current_page() + step) % count)
 
+    def restore_pane_zoom(self, page):
+        for widget in self.maximized_by_page.pop(page, []):
+            widget.set_visible(True)
+
+    def toggle_pane_zoom(self):
+        terminal = self.active_terminal
+        page = self.page_for(terminal) if terminal else None
+        if page is None:
+            return
+        if page in self.maximized_by_page:
+            self.restore_pane_zoom(page)
+        else:
+            hidden = []
+            child = terminal
+            while child != page:
+                parent = child.get_parent()
+                if isinstance(parent, Gtk.Paned):
+                    sibling = (parent.get_end_child() if parent.get_start_child() == child
+                               else parent.get_start_child())
+                    if sibling and sibling.get_visible():
+                        hidden.append(sibling)
+                        sibling.set_visible(False)
+                child = parent
+            if hidden:
+                self.maximized_by_page[page] = hidden
+        terminal.grab_focus()
+
     def change_pane(self, step):
         page = self.notebook.get_nth_page(self.notebook.get_current_page())
         if not page:
@@ -306,6 +425,8 @@ class TerminalWindow(Gtk.ApplicationWindow):
         panes = terminals(page)
         if self.active_terminal in panes:
             terminal = panes[(panes.index(self.active_terminal) + step) % len(panes)]
+            if terminal != self.active_terminal:
+                self.restore_pane_zoom(page)
             self.set_active(terminal)
             terminal.grab_focus()
 
@@ -328,6 +449,7 @@ class Application(Gtk.Application):
             'find-previous': ['<Control><Shift><Alt>g'],
             'next-pane': ['<Control><Shift>bracketright'],
             'previous-pane': ['<Control><Shift>bracketleft'],
+            'toggle-pane-zoom': ['<Control><Shift>Return'],
             'next-tab': ['<Control>Page_Down'], 'previous-tab': ['<Control>Page_Up'],
             'zoom-in': ['<Control>plus', '<Control>equal'], 'zoom-out': ['<Control>minus'],
             'zoom-reset': ['<Control>0'],

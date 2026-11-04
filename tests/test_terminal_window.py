@@ -2,8 +2,10 @@
 import os
 import time
 import unittest
+import weakref
+from unittest.mock import patch
 
-from chiterm import Application, GLib, Gtk, TerminalWindow, Vte
+from chiterm import Application, Gdk, GLib, Gtk, TerminalWindow, Vte
 
 
 def pump_until(predicate, timeout=3):
@@ -21,6 +23,12 @@ def pump_until(predicate, timeout=3):
 class TerminalWindowTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        display_available = Gtk.init_check() and Gdk.Display.get_default() is not None
+        if not display_available:
+            message = 'GTK display unavailable; GUI tests need Xvfb or a desktop session'
+            if os.environ.get('REQUIRE_GUI_TESTS') == '1':
+                raise RuntimeError(message)
+            raise unittest.SkipTest(message)
         cls.original_shell = os.environ.get('SHELL')
         os.environ['SHELL'] = '/bin/sh'
         cls.app = Application()
@@ -99,9 +107,28 @@ class TerminalWindowTests(unittest.TestCase):
     def test_closing_selected_pane_focuses_its_sibling(self):
         remaining = self.win.active_terminal
         self.split()
-        self.win.close_active()
+        with patch.object(self.win, 'confirm_close', side_effect=lambda _message, done: done(True)):
+            self.win.close_active()
         self.assertIs(self.win.active_terminal, remaining)
         self.assertEqual(self.win.notebook.get_n_pages(), 1)
+
+    def test_cancelled_close_keeps_pane_and_shell(self):
+        terminal = self.split()
+        with patch.object(self.win, 'confirm_close', side_effect=lambda _message, done: done(False)):
+            self.win.close_active()
+        self.assertIs(self.win.active_terminal, terminal)
+        self.assertIsNotNone(self.win.page_for(terminal))
+        self.assertIsNotNone(terminal.get_pty())
+
+    def test_confirmed_close_targets_original_pane(self):
+        first = self.win.active_terminal
+        second = self.split()
+        with patch.object(self.win, 'confirm_close') as confirm:
+            self.win.close_active()
+            self.win.set_active(first)
+            confirm.call_args.args[1](True)
+        self.assertIsNone(self.win.page_for(second))
+        self.assertIs(self.win.active_terminal, first)
 
     def test_inactive_pane_title_does_not_replace_active_pane_title(self):
         first = self.win.active_terminal
@@ -114,17 +141,58 @@ class TerminalWindowTests(unittest.TestCase):
         pump_until(lambda: first.get_window_title() == 'inactive pane')
         self.assertEqual(label.get_text(), 'active pane')
 
-    def test_search_is_case_insensitive_and_treats_punctuation_as_text(self):
+    def test_ignore_case_search_treats_punctuation_as_text(self):
         terminal = self.win.active_terminal
         terminal.feed(b'\r\nBuild v1.2 [ready]\r\n')
         pump_until(lambda: terminal.get_cursor_position().row >= 1)
         self.win.open_search()
+        self.win.case_mode.set_selected(2)
         self.win.search_entry.set_text('V1.2 [READY]')
-        pump_until(self.win.find_text)
+        pump_until(lambda: terminal.get_text_selected(Vte.Format.TEXT) == 'v1.2 [ready]')
         self.assertEqual(terminal.get_text_selected(Vte.Format.TEXT), 'v1.2 [ready]')
         self.win.search_entry.set_text('v1x2')
         self.assertFalse(self.win.find_text())
         self.assertEqual(self.win.search_status.get_text(), 'No matches')
+
+    def test_smart_case_and_case_sensitive_search_modes(self):
+        terminal = self.win.active_terminal
+        terminal.feed(b'\r\napple APPLE\r\n')
+        pump_until(lambda: terminal.get_cursor_position().row >= 1)
+        self.win.search_entry.set_text('APPLE')
+        pump_until(lambda: terminal.get_text_selected(Vte.Format.TEXT) == 'APPLE')
+        self.assertEqual(terminal.get_text_selected(Vte.Format.TEXT), 'APPLE')
+        self.win.case_mode.set_selected(1)
+        self.win.search_entry.set_text('apple')
+        pump_until(lambda: terminal.get_text_selected(Vte.Format.TEXT) == 'apple')
+        self.assertEqual(terminal.get_text_selected(Vte.Format.TEXT), 'apple')
+
+    def test_regex_search_and_invalid_pattern_status(self):
+        terminal = self.win.active_terminal
+        terminal.feed(b'\r\nitem 42; item 7\r\n')
+        pump_until(lambda: terminal.get_cursor_position().row >= 1)
+        self.win.regex_toggle.set_active(True)
+        self.win.search_entry.set_text(r'item \d+')
+        pump_until(lambda: terminal.get_text_selected(Vte.Format.TEXT) == 'item 42')
+        self.assertEqual(terminal.get_text_selected(Vte.Format.TEXT), 'item 42')
+        self.win.search_entry.set_text('(')
+        self.assertFalse(self.win.find_text())
+        self.assertEqual(self.win.search_status.get_text(), 'Invalid regular expression')
+
+    def test_search_keyboard_escape_and_shift_enter(self):
+        terminal = self.win.active_terminal
+        terminal.feed(b'\r\nalpha\r\nbeta\r\n')
+        pump_until(lambda: terminal.get_cursor_position().row >= 2)
+        self.win.regex_toggle.set_active(True)
+        self.win.search_entry.set_text('alpha|beta')
+        pump_until(lambda: terminal.get_text_selected(Vte.Format.TEXT) in ('alpha', 'beta'))
+        first = terminal.get_text_selected(Vte.Format.TEXT)
+        self.assertIn(first, ('alpha', 'beta'))
+        self.assertTrue(self.win.on_search_key_pressed(
+            None, Gdk.KEY_Return, 0, Gdk.ModifierType.SHIFT_MASK))
+        self.assertNotEqual(terminal.get_text_selected(Vte.Format.TEXT), first)
+        self.assertTrue(self.win.on_search_key_pressed(None, Gdk.KEY_Escape, 0, 0))
+        self.assertFalse(self.win.search_bar.get_visible())
+        self.assertIsNone(terminal.search_get_regex())
 
     def test_search_targets_only_the_focused_pane(self):
         first = self.win.active_terminal
@@ -139,7 +207,7 @@ class TerminalWindowTests(unittest.TestCase):
         terminal = self.win.active_terminal
         terminal.feed(b'\r\napple\r\nAPPLE\r\n')
         self.win.search_entry.set_text('apple')
-        pump_until(self.win.find_text)
+        pump_until(lambda: terminal.get_text_selected(Vte.Format.TEXT) != '')
         first = terminal.get_text_selected(Vte.Format.TEXT)
         self.assertTrue(self.win.find_text())
         second = terminal.get_text_selected(Vte.Format.TEXT)
@@ -163,6 +231,118 @@ class TerminalWindowTests(unittest.TestCase):
         isolated = self.win.active_terminal
         self.win.change_pane(1)
         self.assertIs(self.win.active_terminal, isolated)
+
+    def test_zoom_restores_nested_panes_without_restarting_shells(self):
+        first = self.win.active_terminal
+        second = self.split()
+        third = self.split()
+        page = self.win.page_for(third)
+        self.win.toggle_pane_zoom()
+        self.assertTrue(third.get_visible())
+        self.assertFalse(first.get_visible())
+        self.assertFalse(second.get_visible())
+        self.assertIsNotNone(first.get_pty())
+        self.assertIsNotNone(second.get_pty())
+        self.win.toggle_pane_zoom()
+        self.assertTrue(first.get_visible())
+        self.assertTrue(second.get_visible())
+        self.assertNotIn(page, self.win.maximized_by_page)
+        self.assertIs(self.win.active_terminal, third)
+
+    def test_zoom_is_per_tab_and_navigation_restores_layout(self):
+        first = self.win.active_terminal
+        second = self.split()
+        self.win.toggle_pane_zoom()
+        self.win.new_tab()
+        self.win.change_tab(-1)
+        self.assertFalse(first.get_visible())
+        self.assertIs(self.win.active_terminal, second)
+        self.win.change_pane(1)
+        self.assertTrue(first.get_visible())
+        self.assertIs(self.win.active_terminal, first)
+
+    def test_zoom_restores_before_hidden_pane_exits_or_new_split(self):
+        hidden = self.win.active_terminal
+        active = self.split()
+        self.win.toggle_pane_zoom()
+        self.exit_shell(hidden)
+        self.assertIs(self.win.active_terminal, active)
+        self.win.split(Gtk.Orientation.VERTICAL)
+        self.assertTrue(active.get_visible())
+        self.assertTrue(self.win.active_terminal.get_visible())
+
+    def test_search_status_and_selection_follow_focused_pane(self):
+        first = self.win.active_terminal
+        first.feed(b'\r\nunique-needle\r\n')
+        pump_until(lambda: first.get_cursor_position().row >= 1)
+        second = self.split()
+        self.win.open_search()
+        self.win.search_entry.set_text('unique-needle')
+        self.assertFalse(self.win.find_text())
+        self.assertEqual(self.win.search_status.get_text(), 'No matches')
+        self.win.change_pane(-1)
+        self.assertIs(self.win.active_terminal, first)
+        self.assertEqual(self.win.search_status.get_text(), '')
+        self.assertEqual(first.get_text_selected(Vte.Format.TEXT), 'unique-needle')
+        self.assertIsNone(second.search_get_regex())
+
+    def test_empty_and_closed_search_clear_vte_regex(self):
+        terminal = self.win.active_terminal
+        self.win.open_search()
+        self.win.search_entry.set_text('needle')
+        self.assertIsNotNone(terminal.search_get_regex())
+        self.win.search_entry.set_text('')
+        self.assertIsNone(terminal.search_get_regex())
+        self.win.search_entry.set_text('needle')
+        self.win.close_search()
+        self.assertIsNone(terminal.search_get_regex())
+        self.assertIsNone(self.win.search_terminal)
+        self.win.open_search()
+        self.assertIsNotNone(terminal.search_get_regex())
+
+    def test_search_cache_does_not_own_terminal(self):
+        terminal = self.win.active_terminal
+        self.win.search_entry.set_text('needle')
+        self.assertIsInstance(self.win.search_terminal, weakref.ReferenceType)
+        self.assertIs(self.win.search_terminal(), terminal)
+
+
+    def tracked_new_tab(self):
+        spawned_pids = []
+        original = self.win.spawned
+
+        def spawned(terminal, pid, error, data):
+            if not error:
+                spawned_pids.append(pid)
+            original(terminal, pid, error, data)
+
+        self.win.spawned = spawned
+        try:
+            self.win.new_tab()
+            pump_until(lambda: bool(spawned_pids))
+        finally:
+            self.win.spawned = original
+        return self.win.active_terminal, spawned_pids[0]
+
+    def test_closing_tab_terminates_idle_shell(self):
+        terminal, pid = self.tracked_new_tab()
+        terminal_ref = weakref.ref(terminal)
+        with patch.object(self.win, 'confirm_close', lambda _message, done: done(True)):
+            self.win.close_active()
+        del terminal
+        pump_until(lambda: terminal_ref() is None and not os.path.exists(f'/proc/{pid}'))
+
+    def test_closing_tab_terminates_foreground_process(self):
+        terminal, shell_pid = self.tracked_new_tab()
+        terminal.feed_child(b'sleep 60\n')
+        pump_until(lambda: os.tcgetpgrp(terminal.get_pty().get_fd()) > 0
+                   and os.tcgetpgrp(terminal.get_pty().get_fd()) != shell_pid)
+        foreground_pid = os.tcgetpgrp(terminal.get_pty().get_fd())
+        with patch.object(self.win, 'confirm_close', lambda _message, done: done(True)):
+            self.win.close_active()
+        del terminal
+        pump_until(lambda: not os.path.exists(f'/proc/{shell_pid}')
+                   and not os.path.exists(f'/proc/{foreground_pid}'))
 
 
 if __name__ == '__main__':
