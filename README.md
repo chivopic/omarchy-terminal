@@ -1,98 +1,52 @@
-# Omarchy Terminal
+# Chiterm
 
-English | [简体中文](README.zh-CN.md)
+[English](README.md) · [简体中文](README.zh-CN.md)
 
-A small, native terminal inspired by the everyday workflow of iTerm2, built for Omarchy and other Linux desktops. It uses GTK 4 and VTE, so each pane runs a real shell with terminal applications, colors and scrollback.
+A native GTK 4 terminal for Omarchy and Linux desktops. Chiterm uses VTE to run real shells in tabs and split panes.
 
-![Illustration of a tabbed terminal with two split panes](assets/terminal-preview.svg)
+![Chiterm workspace concept: tabs and two split panes](assets/terminal-preview.svg)
 
-*Workspace illustration; the actual appearance depends on your desktop theme.*
+*Illustration, not a screenshot. The interface follows your GTK theme.*
 
-## MVP
+## What it does
 
-- Tabs, with drag-to-reorder and shell-provided titles
-- Horizontal and vertical splits, including nested splits
-- Copy, paste, scrollback and font zoom
-- New tabs and splits start in the focused pane's directory when the shell reports it via OSC 7; otherwise they start in your home directory
-- Native GTK window, usable on Wayland and X11
+- Tabs and nested horizontal or vertical splits
+- Scrollback search with smart case and regular expressions
+- Keyboard pane navigation and temporary pane zoom
+- Ctrl-click HTTP(S) links to open them in your browser
+- New panes reuse the current directory when the shell reports it with OSC 7
 
-This is an early MVP, not a complete iTerm2 replacement. See [Current limitations](#current-limitations) before using it for important work.
+## Quick start
 
-## Run
-
-On Omarchy / Arch Linux, install the system dependencies if needed:
+On Omarchy or Arch Linux, install the system bindings:
 
 ```sh
 sudo pacman -S python python-gobject gtk4 vte4
-```
-
-Clone the repository and start the application:
-
-```sh
 git clone https://github.com/chivopic/omarchy-terminal.git
 cd omarchy-terminal
-/usr/bin/python omarchy_terminal.py
+/usr/bin/python chiterm.py
 ```
 
-Use the system Python because the packages above provide its GTK and VTE bindings. The application uses `$SHELL` when it points to an executable file, falling back to `/bin/sh` otherwise. The GTK theme follows your desktop settings; terminal colors currently use VTE defaults.
+Use system Python so it can load the GTK and VTE packages. Chiterm starts `$SHELL` when it is executable, otherwise `/bin/sh`.
 
-## Working directories
-
-New tabs and splits use the focused terminal’s reported local directory. Your shell must emit OSC 7 for this to work; without a valid local directory report, they start in your home directory. Remote directory reports are not used as local paths.
-
-## Working with panes and tabs
-
-Use the **+** button or the header menu to open a tab. Click a pane to focus it, then use the menu or shortcuts below to split it. Drag the divider to resize panes; drag a tab label to reorder tabs. Closing the last pane in a tab closes that tab.
-
-## Current limitations
-
-- There is no confirmation before closing a pane or window, even when a command is running.
-- Tabs and panes are not restored after the application exits.
-- Profiles, terminal search, and automatic Omarchy terminal color synchronization are not implemented.
-
-## Troubleshooting
-
-- **`No module named gi`**: install `python-gobject` and launch with `/usr/bin/python`, not a virtual environment without system bindings.
-- **GTK or VTE namespace unavailable**: check that `gtk4` and `vte4` are installed.
-- **No window opens**: start the application from a running Wayland or X11 desktop session and read any error printed in the launching terminal.
-- **A new pane opens in your home directory**: check whether your shell reports its directory through OSC 7.
-
-## Roadmap
-
-Next up: dependable pane focus and safer closing, followed by search, keyboard navigation, and Omarchy theme integration. See the [roadmap](ROADMAP.md#english) for priorities and current status.
-
-## Contributing
-
-Bug reports and focused pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## Shortcuts
+## Core shortcuts
 
 | Shortcut | Action |
 | --- | --- |
 | Ctrl+Shift+T | New tab |
-| Ctrl+Shift+D | Split left/right |
-| Ctrl+Shift+E | Split top/bottom |
-| Ctrl+Shift+W | Close focused pane (or tab) |
-| Ctrl+Shift+C | Copy selection |
-| Ctrl+Shift+V | Paste |
-| Ctrl+Page Up | Previous tab |
-| Ctrl+Page Down | Next tab |
-| Ctrl++ or Ctrl+= | Zoom in |
-| Ctrl+- | Zoom out |
-| Ctrl+0 | Reset zoom |
+| Ctrl+Shift+D / E | Split left/right / top/bottom |
+| Ctrl+Shift+[ / ] | Previous / next pane |
+| Ctrl+Shift+Enter | Zoom or restore focused pane |
+| Ctrl+Shift+F | Search focused pane |
+| Ctrl+Shift+W | Close pane or tab |
+| Ctrl++ / Ctrl+- / Ctrl+0 | Zoom in / out / reset font |
 
-Closing a pane or window ends its shell and any foreground process; save your work first. Click a pane to focus it. The menu in the header exposes the same main actions.
+See the [English user guide](docs/USER_GUIDE.md) for search controls and all shortcuts.
 
-## Tests
+## Current limits
 
-With the dependencies above and a running graphical session, run:
+Chiterm is an early preview, not a drop-in iTerm2 replacement. Closing asks for confirmation and stops the affected shell and foreground process. Tabs and panes are not restored after exit. Profiles and automatic Omarchy color synchronization are not available.
 
-```sh
-/usr/bin/python -m unittest discover -s tests -v
-```
+## Project
 
-These GTK integration tests launch `/bin/sh` in real VTE panes and exercise tab focus, shell exits, nested splits, and titles. They need a GTK display; they can also run with GTK's Broadway backend on a headless machine.
-
-## License
-
-MIT
+[Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md) · [English manual](docs/USER_GUIDE.md) · [中文使用手册](docs/USER_GUIDE.zh-CN.md) · [MIT License](LICENSE)
