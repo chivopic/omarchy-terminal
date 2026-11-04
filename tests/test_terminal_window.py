@@ -206,6 +206,7 @@ class TerminalWindowTests(unittest.TestCase):
     def test_search_advances_and_wraps_between_matches(self):
         terminal = self.win.active_terminal
         terminal.feed(b'\r\napple\r\nAPPLE\r\n')
+        pump_until(lambda: terminal.get_cursor_position().row >= 2)
         self.win.search_entry.set_text('apple')
         pump_until(lambda: terminal.get_text_selected(Vte.Format.TEXT) != '')
         first = terminal.get_text_selected(Vte.Format.TEXT)
