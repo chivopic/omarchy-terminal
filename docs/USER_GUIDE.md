@@ -10,6 +10,10 @@ New tabs and splits use the focused pane's local working directory when the shel
 
 Pane zoom hides the other panes in that tab until you toggle it again or move focus to another pane. Hidden shells keep running.
 
+## Terminal colors
+
+Choose **Theme** from the header menu to switch among four original Chiterm palettes: **Midnight Fern** and **Harbor Dusk** (dark), plus **Paper Bloom** and **Sage Ledger** (light). They are project palettes, not replicas of third-party theme packs. The selection updates every open pane, including hidden panes, and new panes inherit it. The preference is saved to `$XDG_CONFIG_HOME/chiterm/config.json` or `~/.config/chiterm/config.json`. If the file is invalid or cannot be saved, Chiterm falls back to the default at startup or shows a visible save warning. Palettes affect terminal colors; the GTK title bar still follows the desktop theme.
+
 ## Search
 
 Press **Ctrl+Shift+F** to search the focused pane's scrollback. Search wraps around the scrollback and updates as you type. Use the controls in the search bar to choose:

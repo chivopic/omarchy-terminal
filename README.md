@@ -12,6 +12,7 @@ A native GTK 4 terminal for Omarchy and Linux desktops. Chiterm uses VTE to run 
 
 - Tabs and nested horizontal or vertical splits
 - Scrollback search with smart case and regular expressions
+- Four built-in terminal palettes, including dark and light options
 - Keyboard pane navigation and temporary pane zoom
 - Ctrl-click HTTP(S) links to open them in your browser
 - New panes reuse the current directory when the shell reports it with OSC 7
@@ -42,6 +43,8 @@ Use system Python so it can load the GTK and VTE packages. Chiterm starts `$SHEL
 | Ctrl++ / Ctrl+- / Ctrl+0 | Zoom in / out / reset font |
 
 See the [English user guide](docs/USER_GUIDE.md) for search controls and all shortcuts.
+
+Themes change terminal colors only; the GTK title bar follows your desktop theme. The selected palette is saved in `$XDG_CONFIG_HOME/chiterm/config.json` (or `~/.config/chiterm/config.json`).
 
 ## Current limits
 

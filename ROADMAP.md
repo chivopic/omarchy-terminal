@@ -11,6 +11,7 @@ Chiterm is an early preview. This roadmap describes direction, not release dates
 - Tabs, nested splits, pane focus, and temporary pane zoom
 - Shell working-directory reuse through OSC 7
 - Scrollback search, pane navigation, and Ctrl-click HTTP(S) links
+- Four built-in terminal color palettes
 - GTK/VTE regression suite and Xvfb CI configuration
 
 ### Next
@@ -30,6 +31,7 @@ Chiterm 仍处于早期预览阶段。路线图描述方向，不代表发布时
 - 标签页、嵌套分屏、面板焦点和临时最大化面板
 - 通过 OSC 7 沿用 shell 工作目录
 - 滚动回看搜索、键盘切换面板和 Ctrl 单击 HTTP(S) 链接
+- 四种内置终端配色
 - GTK/VTE 回归测试与 Xvfb CI 配置
 
 ### 后续方向
