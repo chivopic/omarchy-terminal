@@ -9,6 +9,8 @@ import sys
 
 RUNTIME_FILES = (
     'chiterm.py',
+    'command_model.py',
+    'command_palette.py',
     'config.py',
     'diagnostics.py',
     'terminal_links.py',

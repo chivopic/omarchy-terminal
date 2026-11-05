@@ -2,6 +2,7 @@
 """Chiterm: a native terminal powered by GTK 4 and VTE."""
 import os
 import sys
+import uuid
 import weakref
 from pathlib import Path
 from urllib.parse import unquote, urlparse
@@ -22,6 +23,8 @@ from config import ConfigStore
 from terminal_links import install_link_handler
 from terminal_search import build_search_pattern
 from themes import THEMES
+from command_model import ACTION_SHORTCUTS, build_commands
+from command_palette import CommandPalette
 
 APP_ID = 'io.github.chivopic.Chiterm'
 
@@ -45,6 +48,11 @@ class TerminalWindow(Gtk.ApplicationWindow):
         self.active_terminal = None
         self.focused_by_page = {}
         self.maximized_by_page = {}
+        self.page_tokens = {}
+        self.token_pages = {}
+        self.custom_tab_titles = {}
+        self.command_palette = None
+        self.palette_focus = None
         self.search_terminal = None
         self.search_query = None
         self.search_options = None
@@ -64,6 +72,8 @@ class TerminalWindow(Gtk.ApplicationWindow):
         add.connect('clicked', lambda *_: self.new_tab())
         header.pack_start(add)
         menu = Gio.Menu()
+        menu.append('Command Palette', 'win.command-palette')
+        menu.append('Rename Current Tab…', 'win.rename-tab')
         for label, action in [('New Tab', 'new-tab'), ('Split Left / Right', 'split-right'),
                               ('Split Top / Bottom', 'split-down'), ('Close Pane', 'close-pane'),
                               ('Next Pane', 'next-pane'), ('Previous Pane', 'previous-pane'),
@@ -77,8 +87,9 @@ class TerminalWindow(Gtk.ApplicationWindow):
             item.set_action_and_target_value('win.theme', GLib.Variant.new_string(theme_id))
             theme_menu.append_item(item)
         menu.append_submenu('Theme', theme_menu)
-        menu_button = Gtk.MenuButton(icon_name='open-menu-symbolic', menu_model=menu)
-        header.pack_end(menu_button)
+        self.menu_button = Gtk.MenuButton(icon_name='open-menu-symbolic', menu_model=menu)
+        self.menu_button.set_tooltip_text('Terminal actions and commands (Ctrl+Shift+P)')
+        header.pack_end(self.menu_button)
         container.append(header)
         self.status_revealer = Gtk.Revealer()
         self.status_revealer.set_transition_type(Gtk.RevealerTransitionType.SLIDE_DOWN)
@@ -134,6 +145,8 @@ class TerminalWindow(Gtk.ApplicationWindow):
             'toggle-pane-zoom': self.toggle_pane_zoom,
             'zoom-out': lambda: self.zoom(-0.1), 'zoom-reset': lambda: self.zoom(None),
             'next-tab': lambda: self.change_tab(1), 'previous-tab': lambda: self.change_tab(-1),
+            'command-palette': self.open_command_palette,
+            'rename-tab': self.open_rename_dialog,
         }.items():
             action = Gio.SimpleAction.new(name, None)
             action.connect('activate', lambda _action, _param, cb=callback: cb())
@@ -143,6 +156,9 @@ class TerminalWindow(Gtk.ApplicationWindow):
         theme_action.connect('activate', self.on_theme_action)
         self.add_action(theme_action)
         self.theme_action = theme_action
+        select_tab_action = Gio.SimpleAction.new('select-tab', GLib.VariantType.new('s'))
+        select_tab_action.connect('activate', self.on_select_tab_action)
+        self.add_action(select_tab_action)
         self.new_tab()
 
     def make_terminal(self, cwd):
@@ -230,9 +246,128 @@ class TerminalWindow(Gtk.ApplicationWindow):
     def update_title(self, terminal):
         page = self.page_for(terminal)
         if page and self.focused_by_page.get(page) == terminal:
-            label = self.notebook.get_tab_label(page)
-            if label:
-                label.set_text((terminal.get_window_title() or 'Terminal')[:30])
+            self.refresh_tab_title(page)
+
+    def tab_title(self, page):
+        if page in self.custom_tab_titles:
+            return self.custom_tab_titles[page]
+        terminal = self.focused_by_page.get(page) or self.first_terminal(page)
+        return (terminal.get_window_title() or 'Terminal') if terminal else 'Terminal'
+
+    def refresh_tab_title(self, page):
+        label = self.notebook.get_tab_label(page)
+        if label:
+            title = self.tab_title(page)
+            label.set_text(title)
+            label.set_tooltip_text(title)
+
+    def rename_current_tab(self, title):
+        page = self.notebook.get_nth_page(self.notebook.get_current_page())
+        self.rename_page(page, title)
+
+    def rename_page(self, page, title):
+        if page is None or self.notebook.page_num(page) < 0:
+            return
+        title = title.strip()
+        if title:
+            self.custom_tab_titles[page] = title
+        else:
+            self.custom_tab_titles.pop(page, None)
+        self.refresh_tab_title(page)
+
+    def open_rename_dialog(self):
+        page = self.notebook.get_nth_page(self.notebook.get_current_page())
+        if page is None:
+            return
+        if getattr(self, 'rename_dialog', None):
+            self.rename_dialog.present()
+            return
+        terminal = self.active_terminal
+        dialog = Gtk.Window(title='Rename Tab', transient_for=self, modal=True)
+        dialog.set_destroy_with_parent(True)
+        dialog.set_default_size(360, -1)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        box.set_margin_top(16)
+        box.set_margin_bottom(16)
+        box.set_margin_start(16)
+        box.set_margin_end(16)
+        entry = Gtk.Entry(placeholder_text='Tab name (empty restores shell title)')
+        entry.set_text(self.custom_tab_titles.get(page, ''))
+        box.append(entry)
+        buttons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8,
+                          halign=Gtk.Align.END)
+        cancel = Gtk.Button(label='Cancel')
+        save = Gtk.Button(label='Save')
+        buttons.append(cancel)
+        buttons.append(save)
+        box.append(buttons)
+        dialog.set_child(box)
+        self.rename_dialog = dialog
+
+        def finish(save_title):
+            if save_title:
+                self.rename_page(page, entry.get_text())
+            self.rename_dialog = None
+            dialog.destroy()
+            if terminal and self.page_for(terminal):
+                self.set_active(terminal)
+                terminal.grab_focus()
+
+        save.connect('clicked', lambda *_: finish(True))
+        cancel.connect('clicked', lambda *_: finish(False))
+        entry.connect('activate', lambda *_: finish(True))
+        keys = Gtk.EventControllerKey()
+        keys.connect('key-pressed', lambda _controller, key, _code, _state:
+                      (finish(False), True)[1] if key == Gdk.KEY_Escape else False)
+        dialog.add_controller(keys)
+        dialog.connect('close-request', lambda *_: (finish(False), True)[1]
+                       if self.rename_dialog is dialog else False)
+        dialog.present()
+        entry.grab_focus()
+
+    def open_command_palette(self):
+        terminal = self.active_terminal
+        self.palette_focus = weakref.ref(terminal) if terminal else None
+        tabs = []
+        for index in range(self.notebook.get_n_pages()):
+            page = self.notebook.get_nth_page(index)
+            token = self.page_tokens.get(page)
+            if token:
+                tabs.append((token, self.tab_title(page)))
+        themes = [(theme_id, theme.name) for theme_id, theme in THEMES.items()]
+        if self.command_palette is None:
+            self.command_palette = CommandPalette(
+                self.menu_button, self.activate_palette_command,
+                self.restore_command_palette_focus)
+        self.command_palette.open(build_commands(tabs, themes))
+
+    def restore_command_palette_focus(self):
+        terminal = self.palette_focus() if self.palette_focus else None
+        self.palette_focus = None
+        if terminal and self.page_for(terminal):
+            page = self.page_for(terminal)
+            self.notebook.set_current_page(self.notebook.page_num(page))
+            self.set_active(terminal)
+            terminal.grab_focus()
+
+    def activate_palette_command(self, command):
+        action = self.lookup_action(command.action)
+        if action is None:
+            return
+        if command.action == 'select-tab':
+            action.activate(GLib.Variant.new_string(command.target))
+        elif command.action == 'theme':
+            action.activate(GLib.Variant.new_string(command.target))
+        else:
+            action.activate(None)
+
+    def on_select_tab_action(self, _action, parameter):
+        page = self.token_pages.get(parameter.get_string())
+        if page is None:
+            return
+        index = self.notebook.page_num(page)
+        if index >= 0:
+            self.notebook.set_current_page(index)
 
     def page_for(self, widget):
         for index in range(self.notebook.get_n_pages()):
@@ -246,7 +381,14 @@ class TerminalWindow(Gtk.ApplicationWindow):
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, hexpand=True, vexpand=True)
         terminal = self.make_terminal(cwd)
         page.append(terminal)
-        index = self.notebook.append_page(page, Gtk.Label(label='Terminal'))
+        tab_label = Gtk.Label(label='Terminal')
+        tab_label.set_ellipsize(Pango.EllipsizeMode.END)
+        tab_label.set_max_width_chars(24)
+        tab_label.set_tooltip_text('Terminal')
+        index = self.notebook.append_page(page, tab_label)
+        token = uuid.uuid4().hex
+        self.page_tokens[page] = token
+        self.token_pages[token] = page
         self.notebook.set_tab_reorderable(page, True)
         self.notebook.set_current_page(index)
         self.set_active(terminal)
@@ -307,6 +449,10 @@ class TerminalWindow(Gtk.ApplicationWindow):
         else:
             index = self.notebook.page_num(page)
             self.focused_by_page.pop(page, None)
+            self.custom_tab_titles.pop(page, None)
+            token = self.page_tokens.pop(page, None)
+            if token:
+                self.token_pages.pop(token, None)
             self.notebook.remove_page(index)
             if self.notebook.get_n_pages() == 0:
                 self.active_terminal = None
@@ -520,20 +666,8 @@ class Application(Gtk.Application):
 
     def do_startup(self):
         Gtk.Application.do_startup(self)
-        for action, keys in {
-            'new-tab': ['<Control><Shift>t'], 'close-pane': ['<Control><Shift>w'],
-            'split-right': ['<Control><Shift>d'], 'split-down': ['<Control><Shift>e'],
-            'copy': ['<Control><Shift>c'], 'paste': ['<Control><Shift>v'],
-            'find': ['<Control><Shift>f'], 'find-next': ['<Control><Shift>g'],
-            'find-previous': ['<Control><Shift><Alt>g'],
-            'next-pane': ['<Control><Shift>bracketright'],
-            'previous-pane': ['<Control><Shift>bracketleft'],
-            'toggle-pane-zoom': ['<Control><Shift>Return'],
-            'next-tab': ['<Control>Page_Down'], 'previous-tab': ['<Control>Page_Up'],
-            'zoom-in': ['<Control>plus', '<Control>equal'], 'zoom-out': ['<Control>minus'],
-            'zoom-reset': ['<Control>0'],
-        }.items():
-            self.set_accels_for_action('win.' + action, keys)
+        for action, (accelerators, _label) in ACTION_SHORTCUTS.items():
+            self.set_accels_for_action('win.' + action, list(accelerators))
 
 
 if __name__ == '__main__':
