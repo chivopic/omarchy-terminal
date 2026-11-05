@@ -18,6 +18,12 @@ New tabs and splits use the focused pane's local working directory when the shel
 
 Pane zoom hides the other panes in that tab until you toggle it again or move focus to another pane. Hidden shells keep running.
 
+## Command palette and tab names
+
+Press **Ctrl+Shift+P** to search actions, themes, and open tabs. Type to filter, use **Up / Down** to choose a row, **Enter** to run it, and **Escape** to close the palette and return focus to the previous pane. Rows show their keyboard shortcut when one is available. Choosing a tab switches to it; a tab that closes while the palette is open is safely ignored.
+
+Use **Rename Current Tab** from the header menu or command palette to give the current tab a project name. The name takes precedence over shell title updates for the rest of the session. Clear the name in the rename dialog to return to the shell-provided title. Names are not saved after quitting.
+
 ## Terminal colors
 
 Choose **Theme** from the header menu to switch among four original Chiterm palettes: **Midnight Fern** and **Harbor Dusk** (dark), plus **Paper Bloom** and **Sage Ledger** (light). They are project palettes, not replicas of third-party theme packs. The selection updates every open pane, including hidden panes, and new panes inherit it. The preference is saved to `$XDG_CONFIG_HOME/chiterm/config.json` or `~/.config/chiterm/config.json`. If the file is invalid or cannot be saved, Chiterm falls back to the default at startup or shows a visible save warning. Palettes affect terminal colors; the GTK title bar still follows the desktop theme.
@@ -46,6 +52,7 @@ Ctrl-click an HTTP(S) link to open it in your default browser. Ordinary clicks r
 | Ctrl+Shift+W | Close focused pane or tab |
 | Ctrl+Shift+C / V | Copy / paste |
 | Ctrl+Shift+F | Find in the focused pane |
+| Ctrl+Shift+P | Open the command palette |
 | Ctrl+Shift+G / Ctrl+Shift+Alt+G | Next / previous match |
 | Enter / Shift+Enter in search | Next / previous match |
 | F3 / Shift+F3 in search | Next / previous match |

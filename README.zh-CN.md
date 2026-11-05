@@ -14,6 +14,7 @@
 - 滚动回看搜索，支持智能大小写和正则表达式
 - 内置四种终端配色，包含深色和浅色选项
 - 键盘切换面板和临时最大化面板
+- 可搜索操作、配色和标签的命令面板；标签名称仅在当前会话生效
 - 按住 Ctrl 单击 HTTP(S) 链接，在浏览器中打开
 - shell 通过 OSC 7 报告目录时，新面板会沿用当前目录
 
@@ -40,11 +41,12 @@ cd omarchy-terminal
 | Ctrl+Shift+D / E | 左右 / 上下分屏 |
 | Ctrl+Shift+[ / ] | 上一个 / 下一个面板 |
 | Ctrl+Shift+Enter | 最大化 / 恢复当前面板 |
+| Ctrl+Shift+P | 搜索操作、配色和标签 |
 | Ctrl+Shift+F | 搜索当前面板 |
 | Ctrl+Shift+W | 关闭面板或标签 |
 | Ctrl++ / Ctrl+- / Ctrl+0 | 放大 / 缩小 / 重置字体 |
 
-搜索选项和完整快捷键见[中文使用手册](docs/USER_GUIDE.zh-CN.md)。
+标签命名、搜索选项和完整快捷键见[中文使用手册](docs/USER_GUIDE.zh-CN.md)。
 
 配色只影响终端内容区；GTK 标题栏仍跟随桌面主题。当前配色保存在 `$XDG_CONFIG_HOME/chiterm/config.json`（未设置时为 `~/.config/chiterm/config.json`）。
 

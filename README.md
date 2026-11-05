@@ -14,6 +14,7 @@ A native GTK 4 terminal for Omarchy and Linux desktops. Chiterm uses VTE to run 
 - Scrollback search with smart case and regular expressions
 - Four built-in terminal palettes, including dark and light options
 - Keyboard pane navigation and temporary pane zoom
+- A searchable command palette for actions, themes, and tabs; rename tabs per session
 - Ctrl-click HTTP(S) links to open them in your browser
 - New panes reuse the current directory when the shell reports it with OSC 7
 
@@ -40,11 +41,12 @@ Install or update a user copy with `make install`, then launch `~/.local/bin/chi
 | Ctrl+Shift+D / E | Split left/right / top/bottom |
 | Ctrl+Shift+[ / ] | Previous / next pane |
 | Ctrl+Shift+Enter | Zoom or restore focused pane |
+| Ctrl+Shift+P | Search commands, themes, and tabs |
 | Ctrl+Shift+F | Search focused pane |
 | Ctrl+Shift+W | Close pane or tab |
 | Ctrl++ / Ctrl+- / Ctrl+0 | Zoom in / out / reset font |
 
-See the [English user guide](docs/USER_GUIDE.md) for search controls and all shortcuts.
+See the [English user guide](docs/USER_GUIDE.md) for tab naming, search controls, and all shortcuts.
 
 Themes change terminal colors only; the GTK title bar follows your desktop theme. The selected palette is saved in `$XDG_CONFIG_HOME/chiterm/config.json` (or `~/.config/chiterm/config.json`).
 

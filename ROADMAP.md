@@ -2,6 +2,8 @@
 
 [English](#english) · [简体中文](#简体中文)
 
+Product direction / 产品方向: [English and Chinese](docs/PRODUCT_DIRECTION.md)
+
 ## English
 
 Chiterm is an early preview. This roadmap describes direction, not release dates.
@@ -12,6 +14,7 @@ Chiterm is an early preview. This roadmap describes direction, not release dates
 - Shell working-directory reuse through OSC 7
 - Scrollback search, pane navigation, and Ctrl-click HTTP(S) links
 - Four built-in terminal color palettes
+- Searchable command palette for actions, themes, and tabs; session-only tab names
 - User-prefix install/update/uninstall and dependency diagnostics
 - GTK/VTE regression suite and Xvfb CI configuration
 
@@ -33,6 +36,7 @@ Chiterm 仍处于早期预览阶段。路线图描述方向，不代表发布时
 - 通过 OSC 7 沿用 shell 工作目录
 - 滚动回看搜索、键盘切换面板和 Ctrl 单击 HTTP(S) 链接
 - 四种内置终端配色
+- 可搜索操作、配色和标签的命令面板；仅当前会话有效的标签名称
 - 用户前缀安装、更新、卸载和依赖诊断
 - GTK/VTE 回归测试与 Xvfb CI 配置
 
