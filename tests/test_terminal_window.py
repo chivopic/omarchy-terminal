@@ -405,6 +405,88 @@ class TerminalWindowTests(unittest.TestCase):
         pump_until(lambda: not os.path.exists(f'/proc/{shell_pid}')
                    and not os.path.exists(f'/proc/{foreground_pid}'))
 
+    def test_command_palette_filters_immediately_and_shows_empty_state(self):
+        self.win.open_command_palette()
+        palette = self.win.command_palette
+        palette.search_entry.set_text('New Tab')
+        self.assertEqual([command.action for command in palette.visible_commands], ['new-tab'])
+        palette.search_entry.set_text('nothing matches')
+        self.assertEqual(palette.visible_commands, [])
+        self.assertTrue(palette.no_results.get_visible())
+        self.assertFalse(palette.scroller.get_visible())
+        palette.popdown()
+
+    def test_command_palette_escape_restores_original_pane_focus(self):
+        terminal = self.win.active_terminal
+        self.win.open_command_palette()
+        palette = self.win.command_palette
+        pump_until(palette.get_visible)
+        self.assertTrue(palette.on_key_pressed(None, Gdk.KEY_Escape, 0, 0))
+        pump_until(lambda: not palette.get_visible())
+        self.assertIs(self.win.active_terminal, terminal)
+        pump_until(lambda: (self.win.get_focus() == terminal
+                            or self.win.get_focus().is_ancestor(terminal)))
+
+    def test_command_palette_enter_executes_the_first_matching_action(self):
+        self.win.open_command_palette()
+        palette = self.win.command_palette
+        palette.search_entry.set_text('New Tab')
+        self.assertTrue(palette.on_key_pressed(None, Gdk.KEY_Return, 0, 0))
+        pump_until(lambda: self.win.notebook.get_n_pages() == 2)
+        self.assertEqual(self.win.notebook.get_n_pages(), 2)
+
+    def test_command_palette_selection_keys_activate_selected_theme(self):
+        self.win.open_command_palette()
+        palette = self.win.command_palette
+        palette.search_entry.set_text('Theme')
+        self.assertEqual(len(palette.visible_commands), len(THEMES))
+        self.assertTrue(palette.on_key_pressed(None, Gdk.KEY_Down, 0, 0))
+        selected = palette.visible_commands[1]
+        palette.on_key_pressed(None, Gdk.KEY_Return, 0, 0)
+        pump_until(lambda: self.win.current_theme == selected.target)
+        self.assertEqual(self.win.current_theme, selected.target)
+
+    def test_command_palette_find_command_receives_focus_after_close(self):
+        self.win.open_command_palette()
+        palette = self.win.command_palette
+        palette.search_entry.set_text('Find in Pane')
+        palette.on_key_pressed(None, Gdk.KEY_Return, 0, 0)
+        pump_until(lambda: self.win.search_bar.get_visible()
+                   and (self.win.get_focus() == self.win.search_entry
+                        or self.win.get_focus().is_ancestor(self.win.search_entry)))
+
+    def test_command_palette_selects_named_tab_and_ignores_stale_tokens(self):
+        self.win.new_tab()
+        target_page = self.win.notebook.get_nth_page(1)
+        self.win.rename_current_tab('Project B')
+        token = self.win.page_tokens[target_page]
+        self.win.notebook.set_current_page(0)
+        self.win.open_command_palette()
+        palette = self.win.command_palette
+        palette.search_entry.set_text('Project B')
+        self.assertEqual([(command.action, command.target)
+                          for command in palette.visible_commands], [('select-tab', token)])
+        palette.on_key_pressed(None, Gdk.KEY_Return, 0, 0)
+        pump_until(lambda: self.win.notebook.get_current_page() == 1)
+        self.assertIs(self.win.notebook.get_nth_page(1), target_page)
+        self.exit_shell(self.win.active_terminal)
+        current = self.win.notebook.get_nth_page(self.win.notebook.get_current_page())
+        self.win.lookup_action('select-tab').activate(GLib.Variant.new_string(token))
+        self.assertIs(self.win.notebook.get_nth_page(self.win.notebook.get_current_page()), current)
+
+    def test_custom_tab_title_survives_shell_title_and_clearing_restores_it(self):
+        terminal = self.win.active_terminal
+        page = self.win.page_for(terminal)
+        label = self.win.notebook.get_tab_label(page)
+        self.win.rename_current_tab('Project Alpha')
+        self.assertEqual(label.get_text(), 'Project Alpha')
+        terminal.feed(b'\x1b]0;dynamic shell title\x07')
+        pump_until(lambda: terminal.get_window_title() == 'dynamic shell title')
+        self.assertEqual(label.get_text(), 'Project Alpha')
+        self.assertEqual(label.get_tooltip_text(), 'Project Alpha')
+        self.win.rename_current_tab('  ')
+        self.assertEqual(label.get_text(), 'dynamic shell title')
+
 
 if __name__ == '__main__':
     unittest.main()
