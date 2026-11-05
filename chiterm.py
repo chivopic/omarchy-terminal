@@ -6,6 +6,13 @@ import weakref
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
+from diagnostics import handle_cli
+
+if __name__ == '__main__':
+    diagnostic_status = handle_cli(sys.argv[1:])
+    if diagnostic_status is not None:
+        raise SystemExit(diagnostic_status)
+
 import gi
 gi.require_version('Gdk', '4.0')
 gi.require_version('Gtk', '4.0')
