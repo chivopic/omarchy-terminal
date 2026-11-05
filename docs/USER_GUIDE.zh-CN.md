@@ -2,6 +2,14 @@
 
 [English](USER_GUIDE.md) · [返回 README](../README.zh-CN.md)
 
+## 安装和更新
+
+在仓库目录运行 `make install`，会将 Chiterm 安装到 `~/.local`；再次运行即可更新。通过 `~/.local/bin/chiterm` 启动。`make uninstall` 只移除 Chiterm 已知文件，会保留 `~/.config/chiterm` 或 `$XDG_CONFIG_HOME/chiterm` 中的用户设置。
+
+可用 `make install PREFIX="/custom/path"` 指定其他前缀。安装器支持路径中包含空格；遇到桌面入口不支持的特殊字符时会拒绝安装，避免生成不可用的启动器。打包暂存时设置 `DESTDIR=/tmp/package-root`，同时将 `PREFIX` 保持为最终安装路径。生成的桌面入口指向最终安装位置，不依赖源码仓库。
+
+运行 `chiterm --version` 可在不加载 GTK 时查看版本。`chiterm --check` 会报告 Python、GTK、VTE 和显示服务状态，并在绑定缺失时提示安装依赖。
+
 ## 标签页和面板
 
 点击标题栏的 **+** 按钮或菜单中的 **New Tab** 新建标签。点击面板可切换焦点。通过标题栏菜单或下方快捷键，将当前面板左右或上下分屏。拖动分隔线可调整大小，拖动标签标题可重新排序。

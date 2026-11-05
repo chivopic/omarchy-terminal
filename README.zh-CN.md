@@ -30,6 +30,8 @@ cd omarchy-terminal
 
 请使用系统 Python 来加载 GTK 和 VTE 软件包。Chiterm 会启动可执行的 `$SHELL`，否则回退到 `/bin/sh`。
 
+运行 `make install` 可在用户目录安装或更新，然后通过 `~/.local/bin/chiterm` 启动。`make uninstall` 只移除 Chiterm 安装文件，会保留用户设置。可用 `make install PREFIX="/custom/path"` 指定其他前缀。
+
 ## 常用快捷键
 
 | 快捷键 | 操作 |
@@ -45,6 +47,8 @@ cd omarchy-terminal
 搜索选项和完整快捷键见[中文使用手册](docs/USER_GUIDE.zh-CN.md)。
 
 配色只影响终端内容区；GTK 标题栏仍跟随桌面主题。当前配色保存在 `$XDG_CONFIG_HOME/chiterm/config.json`（未设置时为 `~/.config/chiterm/config.json`）。
+
+运行 `chiterm --version` 可在不加载 GTK 的情况下查看版本；`chiterm --check` 会诊断 Python、GTK、VTE 和图形显示服务。
 
 ## 当前限制
 

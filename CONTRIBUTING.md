@@ -8,10 +8,11 @@ For a pull request, describe the problem and change, keep the scope focused, and
 
 ### Checks
 
-- `make check` runs syntax checks and automatically discovers display-free search, theme, config, and link tests. It uses the system Python with GTK/VTE bindings; install the packages listed in the README first. The GUI class is explicitly skipped by this target.
+- `make check` runs syntax checks and automatically discovers display-free search, theme, config, link, installer, and diagnostics tests. It uses the system Python with GTK/VTE bindings; install the packages listed in the README first. The GUI class is explicitly skipped by this target.
 - Search pattern logic alone can be tested with `python3 -m unittest discover -s tests -p 'test_terminal_search.py'` and needs only Python.
 - `make test-gui` runs the real GTK/VTE integration suite, including search, theme switching, persistence, and pane lifecycle, and fails if no display is available.
 - On a headless machine, run `xvfb-run -a dbus-run-session -- make test-all`.
+- `python3 install.py --prefix "/tmp/chiterm test"` exercises installation without changing the default user prefix. Installer tests use temporary directories and verify uninstall leaves settings and unrelated files intact.
 
 Ordinary `unittest discover` skips the GUI test class when there is no display. A skipped GUI suite is not evidence that interface behavior passed. GitHub Actions runs all checks under Xvfb.
 
@@ -25,10 +26,11 @@ Please remove private paths, tokens, and sensitive terminal output from issues a
 
 ### 检查
 
-- `make check` 会运行语法检查，并自动发现无需图形显示的搜索、主题、配置和链接测试。它使用带 GTK/VTE 绑定的系统 Python，请先按 README 安装依赖。该目标会显式跳过 GUI 测试类。
+- `make check` 会运行语法检查，并自动发现无需图形显示的搜索、主题、配置、链接、安装器和诊断测试。它使用带 GTK/VTE 绑定的系统 Python，请先按 README 安装依赖。该目标会显式跳过 GUI 测试类。
 - 只测试搜索模式可运行 `python3 -m unittest discover -s tests -p 'test_terminal_search.py'`，只需要 Python。
 - `make test-gui` 会运行真实 GTK/VTE 集成测试，覆盖搜索、主题切换、配置持久化和面板生命周期；没有显示服务时会失败。
 - 无头环境可运行 `xvfb-run -a dbus-run-session -- make test-all`。
+- `python3 install.py --prefix "/tmp/chiterm test"` 可在临时前缀中试装，不会更改默认用户目录。安装测试使用临时目录，并确认卸载保留配置和无关文件。
 
 普通的 `unittest discover` 在没有显示服务时会跳过 GUI 测试类。跳过 GUI 测试并不表示界面行为已经通过验证。GitHub Actions 会在 Xvfb 下运行所有检查。
 

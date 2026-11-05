@@ -2,6 +2,14 @@
 
 [简体中文](USER_GUIDE.zh-CN.md) · [Back to README](../README.md)
 
+## Install and update
+
+From a checkout, run `make install` to copy Chiterm into `~/.local`; running it again updates the installed files. Launch `~/.local/bin/chiterm`. Use `make uninstall` to remove only Chiterm's known files. Your settings in `~/.config/chiterm` or `$XDG_CONFIG_HOME/chiterm` are kept.
+
+Use `make install PREFIX="/custom/path"` for another prefix. The installer supports spaces in the prefix and rejects desktop-entry metacharacters rather than creating a broken launcher. For package staging, set `DESTDIR=/tmp/package-root` while keeping `PREFIX` as the final install path. The generated desktop entry uses the final path and does not depend on the source checkout.
+
+Run `chiterm --version` without loading GTK. `chiterm --check` reports Python, GTK, VTE and display status, with install hints when bindings are missing.
+
 ## Tabs and panes
 
 Use the **+** button or **New Tab** in the header menu to open a tab. Click a pane to focus it. Split the focused pane left/right or top/bottom from the menu or with the shortcuts below. Drag a divider to resize panes and drag tab labels to reorder tabs.

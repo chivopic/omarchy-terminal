@@ -30,6 +30,8 @@ cd omarchy-terminal
 
 Use system Python so it can load the GTK and VTE packages. Chiterm starts `$SHELL` when it is executable, otherwise `/bin/sh`.
 
+Install or update a user copy with `make install`, then launch `~/.local/bin/chiterm`. Run `make uninstall` to remove Chiterm files; user settings are kept. `make install PREFIX="/custom/path"` selects another prefix.
+
 ## Core shortcuts
 
 | Shortcut | Action |
@@ -45,6 +47,8 @@ Use system Python so it can load the GTK and VTE packages. Chiterm starts `$SHEL
 See the [English user guide](docs/USER_GUIDE.md) for search controls and all shortcuts.
 
 Themes change terminal colors only; the GTK title bar follows your desktop theme. The selected palette is saved in `$XDG_CONFIG_HOME/chiterm/config.json` (or `~/.config/chiterm/config.json`).
+
+Run `chiterm --version` to print the version without loading GTK, or `chiterm --check` to diagnose Python, GTK, VTE, and display availability.
 
 ## Current limits
 
